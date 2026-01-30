@@ -4,6 +4,7 @@ import { createApp } from './app';
 import { env } from './config/environment';
 import { pool } from './config/database';
 import { logger } from './shared/utils/logger.util';
+import { setupSocketHandlers } from './websocket/socket.handler';
 
 const PORT = parseInt(env.PORT, 10);
 
@@ -18,14 +19,8 @@ const io = new Server(httpServer, {
   },
 });
 
-// Socket.io connection handler (will be expanded later)
-io.on('connection', (socket) => {
-  logger.info(`🔌 Socket connected: ${socket.id}`);
-
-  socket.on('disconnect', () => {
-    logger.info(`🔌 Socket disconnected: ${socket.id}`);
-  });
-});
+// Setup WebSocket handlers with authentication
+setupSocketHandlers(io);
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {

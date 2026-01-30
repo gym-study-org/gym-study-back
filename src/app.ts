@@ -13,6 +13,9 @@ import usersRoutes from './modules/users/users.routes';
 import studySessionsRoutes from './modules/study-sessions/study-sessions.routes';
 import certificationsRoutes from './modules/certifications/certifications.routes';
 import goalsRoutes from './modules/goals/goals.routes';
+import friendshipsRoutes from './modules/friendships/friendships.routes';
+import rankingRoutes from './modules/ranking/ranking.routes';
+import challengesRoutes from './modules/challenges/challenges.routes';
 
 export const createApp = (): Application => {
   const app = express();
@@ -55,6 +58,9 @@ export const createApp = (): Application => {
   app.use('/api/study-sessions', studySessionsRoutes);
   app.use('/api/certifications', certificationsRoutes);
   app.use('/api/goals', goalsRoutes);
+  app.use('/api/friendships', friendshipsRoutes);
+  app.use('/api/ranking', rankingRoutes);
+  app.use('/api/challenges', challengesRoutes);
 
   // 404 handler
   app.use((_req, res) => {
