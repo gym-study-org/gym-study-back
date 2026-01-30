@@ -35,6 +35,11 @@ const envSchema = z.object({
 
   RATE_LIMIT_WINDOW_MS: z.string().default('900000'),
   RATE_LIMIT_MAX_REQUESTS: z.string().default('100'),
+
+  // Cloudinary
+  CLOUDINARY_CLOUD_NAME: z.string().optional(),
+  CLOUDINARY_API_KEY: z.string().optional(),
+  CLOUDINARY_API_SECRET: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

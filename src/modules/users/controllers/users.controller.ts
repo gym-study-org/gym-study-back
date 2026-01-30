@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { UsersService } from '../services/users.service';
 import { ResponseUtil } from '../../../shared/utils/response.util';
+import { AppError } from '../../../shared/middlewares/error-handler.middleware';
 
 export class UsersController {
   static async getMe(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -18,6 +19,44 @@ export class UsersController {
       const userId = req.user!.id;
       const user = await UsersService.updateUser(userId, req.body);
       ResponseUtil.success(res, user, 'Profile updated successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Upload user avatar
+   * POST /users/me/avatar
+   */
+  static async uploadAvatar(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user!.id;
+
+      if (!req.file) {
+        throw new AppError(400, 'NO_FILE', 'Nenhum arquivo enviado');
+      }
+
+      // Multer-cloudinary storage returns the URL in req.file.path
+      const avatarUrl = (req.file as any).path;
+
+      const user = await UsersService.updateAvatarUrl(userId, avatarUrl);
+      ResponseUtil.success(res, user, 'Avatar atualizado com sucesso');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Get public profile of a user
+   * GET /users/:id/profile
+   */
+  static async getPublicProfile(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.params.id;
+      const viewerId = req.user!.id;
+
+      const profile = await UsersService.getPublicProfile(userId, viewerId);
+      ResponseUtil.success(res, profile);
     } catch (error) {
       next(error);
     }

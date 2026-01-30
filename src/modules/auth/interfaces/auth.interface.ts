@@ -17,6 +17,7 @@ export interface AuthResponse {
     username: string;
     full_name: string | null;
     avatar_url: string | null;
+    bio: string | null;
   };
   token: string;
   refreshToken: string;

@@ -25,7 +25,7 @@ export class AuthService {
     const result = await query(
       `INSERT INTO users (email, username, password_hash, full_name, auth_provider)
        VALUES ($1, $2, $3, $4, 'local')
-       RETURNING id, email, username, full_name, avatar_url`,
+       RETURNING id, email, username, full_name, avatar_url, bio`,
       [email, username, password_hash, full_name || null]
     );
 
@@ -48,6 +48,7 @@ export class AuthService {
         username: user.username,
         full_name: user.full_name,
         avatar_url: user.avatar_url,
+        bio: user.bio,
       },
       token,
       refreshToken,
@@ -59,7 +60,7 @@ export class AuthService {
 
     // Find user
     const result = await query(
-      `SELECT id, email, username, password_hash, full_name, avatar_url, is_active
+      `SELECT id, email, username, password_hash, full_name, avatar_url, bio, is_active
        FROM users
        WHERE email = $1 AND deleted_at IS NULL`,
       [email]
@@ -109,6 +110,7 @@ export class AuthService {
         username: user.username,
         full_name: user.full_name,
         avatar_url: user.avatar_url,
+        bio: user.bio,
       },
       token,
       refreshToken,
