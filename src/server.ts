@@ -5,6 +5,7 @@ import { env } from './config/environment';
 import { pool } from './config/database';
 import { logger } from './shared/utils/logger.util';
 import { setupSocketHandlers } from './websocket/socket.handler';
+import { startAllJobs } from './jobs';
 
 const PORT = parseInt(env.PORT, 10);
 
@@ -44,6 +45,9 @@ httpServer.listen(PORT, '0.0.0.0', () => {
     ║   URL: http://localhost:${PORT.toString().padEnd(14)}║
     ╚═══════════════════════════════════════╝
   `);
+
+  // Start cron jobs after server is running
+  startAllJobs();
 });
 
 export { io };

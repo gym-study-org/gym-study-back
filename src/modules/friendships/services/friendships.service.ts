@@ -5,6 +5,8 @@ import {
   FriendRequest,
 } from '../interfaces/friendship.interface';
 import { AppError } from '../../../shared/utils/AppError';
+import { checkAndEmitAchievements } from '../../achievements/controllers/achievements.controller';
+import { logger } from '../../../shared/utils/logger.util';
 
 export class FriendshipsService {
   /**
@@ -91,7 +93,19 @@ export class FriendshipsService {
     `;
 
     const result = await pool.query<Friendship>(query, [status, friendshipId]);
-    return result.rows[0];
+    const updatedFriendship = result.rows[0];
+
+    // If accepted, check social achievements for both users
+    if (status === 'accepted') {
+      checkAndEmitAchievements(userId, 'social').catch((err) =>
+        logger.error('Error checking social achievements:', err)
+      );
+      checkAndEmitAchievements(request.requester_id, 'social').catch((err) =>
+        logger.error('Error checking social achievements:', err)
+      );
+    }
+
+    return updatedFriendship;
   }
 
   /**

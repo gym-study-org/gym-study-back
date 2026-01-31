@@ -16,6 +16,8 @@ import goalsRoutes from './modules/goals/goals.routes';
 import friendshipsRoutes from './modules/friendships/friendships.routes';
 import rankingRoutes from './modules/ranking/ranking.routes';
 import challengesRoutes from './modules/challenges/challenges.routes';
+import achievementsRoutes from './modules/achievements/achievements.routes';
+import badgesRoutes from './modules/badges/badges.routes';
 
 export const createApp = (): Application => {
   const app = express();
@@ -61,6 +63,8 @@ export const createApp = (): Application => {
   app.use('/api/friendships', friendshipsRoutes);
   app.use('/api/ranking', rankingRoutes);
   app.use('/api/challenges', challengesRoutes);
+  app.use('/api/achievements', achievementsRoutes);
+  app.use('/api/badges', badgesRoutes);
 
   // 404 handler
   app.use((_req, res) => {
