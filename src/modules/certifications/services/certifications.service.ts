@@ -5,6 +5,8 @@ import {
   UpdateCertificationInput,
 } from '../interfaces/certification.interface';
 import { AppError } from '../../../shared/utils/AppError';
+import { checkAndEmitAchievements } from '../../achievements/controllers/achievements.controller';
+import { logger } from '../../../shared/utils/logger.util';
 
 export class CertificationsService {
   /**
@@ -38,7 +40,14 @@ export class CertificationsService {
     ];
 
     const result = await pool.query<Certification>(query, values);
-    return result.rows[0];
+    const certification = result.rows[0];
+
+    // Check for certification achievements (async, don't block response)
+    checkAndEmitAchievements(userId, 'certifications').catch((err) =>
+      logger.error('Error checking certification achievements:', err)
+    );
+
+    return certification;
   }
 
   /**

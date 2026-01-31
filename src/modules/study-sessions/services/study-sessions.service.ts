@@ -7,6 +7,10 @@ import {
   StudySessionStats,
 } from '../interfaces/study-sessions.interface';
 import { PaginationParams } from '../../../shared/types/common.types';
+import { updateUserStreak } from '../../../jobs/streak.job';
+import { checkAndEmitAchievements } from '../../achievements/controllers/achievements.controller';
+import { achievementsService } from '../../achievements/services/achievements.service';
+import { logger } from '../../../shared/utils/logger.util';
 
 export class StudySessionsService {
   static async create(userId: string, data: CreateStudySessionDTO): Promise<StudySession> {
@@ -42,7 +46,34 @@ export class StudySessionsService {
       ]
     );
 
-    return result.rows[0];
+    const session = result.rows[0];
+
+    // Update user streak (async, don't block response)
+    updateUserStreak(userId).catch((err) =>
+      logger.error('Error updating streak:', err)
+    );
+
+    // Check for achievements (sessions and study_hours categories)
+    checkAndEmitAchievements(userId, 'sessions').catch((err) =>
+      logger.error('Error checking sessions achievements:', err)
+    );
+    checkAndEmitAchievements(userId, 'study_hours').catch((err) =>
+      logger.error('Error checking study_hours achievements:', err)
+    );
+    checkAndEmitAchievements(userId, 'streak').catch((err) =>
+      logger.error('Error checking streak achievements:', err)
+    );
+
+    // Check special achievements (early bird, night owl)
+    const sessionTime = new Date(started_at);
+    achievementsService.checkEarlyBirdAchievement(userId, sessionTime).catch((err) =>
+      logger.error('Error checking early bird achievement:', err)
+    );
+    achievementsService.checkNightOwlAchievement(userId, sessionTime).catch((err) =>
+      logger.error('Error checking night owl achievement:', err)
+    );
+
+    return session;
   }
 
   static async findByUserId(

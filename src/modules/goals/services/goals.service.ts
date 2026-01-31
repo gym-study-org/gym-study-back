@@ -1,6 +1,8 @@
 import { pool } from '../../../config/database';
 import { Goal, CreateGoalInput, UpdateGoalInput, GoalStatus } from '../interfaces/goal.interface';
 import { AppError } from '../../../shared/utils/AppError';
+import { checkAndEmitAchievements } from '../../achievements/controllers/achievements.controller';
+import { logger } from '../../../shared/utils/logger.util';
 
 export class GoalsService {
   /**
@@ -93,8 +95,8 @@ export class GoalsService {
    * Update a goal
    */
   async update(userId: string, goalId: string, data: UpdateGoalInput): Promise<Goal> {
-    // Check if goal exists and belongs to user
-    await this.getById(userId, goalId);
+    // Check if goal exists and belongs to user, and save for later comparison
+    const existingGoal = await this.getById(userId, goalId);
 
     const fields: string[] = [];
     const values: any[] = [];
@@ -155,7 +157,16 @@ export class GoalsService {
     `;
 
     const result = await pool.query<Goal>(query, values);
-    return result.rows[0];
+    const updatedGoal = result.rows[0];
+
+    // If status was updated to 'completed' and wasn't already completed, check for achievements
+    if (data.status === 'completed' && existingGoal.status !== 'completed') {
+      checkAndEmitAchievements(userId, 'goals').catch((err) =>
+        logger.error('Error checking goal achievements:', err)
+      );
+    }
+
+    return updatedGoal;
   }
 
   /**
@@ -191,7 +202,17 @@ export class GoalsService {
     `;
 
     const result = await pool.query<Goal>(query, [newCurrentValue, newStatus, goalId, userId]);
-    return result.rows[0];
+    const updatedGoal = result.rows[0];
+
+    // If goal was just completed, check for achievements
+    // (we already verified at line 193 that goal.status was 'active')
+    if (newStatus === 'completed') {
+      checkAndEmitAchievements(userId, 'goals').catch((err) =>
+        logger.error('Error checking goal achievements:', err)
+      );
+    }
+
+    return updatedGoal;
   }
 
   /**

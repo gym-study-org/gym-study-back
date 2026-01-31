@@ -26,6 +26,9 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package*.json ./
 
+# Copy migrations (SQL files)
+COPY --from=builder /app/src/database/migrations ./dist/database/migrations
+
 # Create logs directory
 RUN mkdir -p logs
 
