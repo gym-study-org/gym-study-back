@@ -131,11 +131,11 @@ CREATE OR REPLACE FUNCTION update_friends_count()
 RETURNS TRIGGER AS $$
 BEGIN
     IF TG_OP = 'UPDATE' AND NEW.status = 'accepted' AND OLD.status != 'accepted' THEN
-        UPDATE users SET friends_count = friends_count + 1 WHERE id = NEW.user_id;
-        UPDATE users SET friends_count = friends_count + 1 WHERE id = NEW.friend_id;
+        UPDATE users SET friends_count = friends_count + 1 WHERE id = NEW.requester_id;
+        UPDATE users SET friends_count = friends_count + 1 WHERE id = NEW.addressee_id;
     ELSIF TG_OP = 'DELETE' AND OLD.status = 'accepted' THEN
-        UPDATE users SET friends_count = GREATEST(0, friends_count - 1) WHERE id = OLD.user_id;
-        UPDATE users SET friends_count = GREATEST(0, friends_count - 1) WHERE id = OLD.friend_id;
+        UPDATE users SET friends_count = GREATEST(0, friends_count - 1) WHERE id = OLD.requester_id;
+        UPDATE users SET friends_count = GREATEST(0, friends_count - 1) WHERE id = OLD.addressee_id;
     END IF;
     RETURN NULL;
 END;
@@ -170,7 +170,7 @@ UPDATE users u SET
     certifications_count = COALESCE((SELECT COUNT(*) FROM certifications WHERE user_id = u.id), 0),
     friends_count = COALESCE((
         SELECT COUNT(*) FROM friendships
-        WHERE (user_id = u.id OR friend_id = u.id) AND status = 'accepted'
+        WHERE (requester_id = u.id OR addressee_id = u.id) AND status = 'accepted'
     ), 0),
     completed_goals_count = COALESCE((
         SELECT COUNT(*) FROM goals WHERE user_id = u.id AND status = 'completed'
