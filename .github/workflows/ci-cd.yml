@@ -50,8 +50,6 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}:${{ steps.tag.outputs.new_tag }}
             ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}:${{ steps.env.outputs.name }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
 
   Deploy:
     runs-on: ubuntu-latest
