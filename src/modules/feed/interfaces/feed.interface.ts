@@ -6,9 +6,11 @@ export type PostType =
   | 'challenge_complete'
   | 'milestone'
   | 'code_snippet'
-  | 'poll';
+  | 'poll'
+  | 'shared_post';
 
 export type PostVisibility = 'public' | 'friends' | 'private';
+export type PostAudience = 'global' | 'personal';
 
 export interface Post {
   id: string;
@@ -21,6 +23,7 @@ export interface Post {
   metadata: Record<string, unknown>;
   tags: string[];
   visibility: PostVisibility;
+  audience: PostAudience;
   likes_count: number;
   comments_count: number;
   is_pinned: boolean;
@@ -64,6 +67,7 @@ export interface CreatePostDTO {
   metadata?: Record<string, unknown>;
   tags?: string[];
   visibility?: PostVisibility;
+  audience?: PostAudience;
 }
 
 export interface UpdatePostDTO {

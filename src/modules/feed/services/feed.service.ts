@@ -49,6 +49,7 @@ export class FeedService {
       FROM posts p
       JOIN users u ON u.id = p.user_id
       WHERE p.deleted_at IS NULL
+        AND p.audience = 'global'
         AND (
           p.user_id = $1
           OR (
@@ -129,7 +130,8 @@ export class FeedService {
     userId: string,
     targetUserId: string,
     limit: number,
-    cursor?: string
+    cursor?: string,
+    audience?: 'global' | 'personal'
   ): Promise<PostWithAuthor[]> {
     const params: unknown[] = [userId, targetUserId, limit];
     let paramIdx = 4;
@@ -138,6 +140,13 @@ export class FeedService {
     if (cursor) {
       cursorClause = `AND p.created_at < $${paramIdx}`;
       params.push(cursor);
+      paramIdx++;
+    }
+
+    let audienceClause = '';
+    if (audience) {
+      audienceClause = `AND p.audience = $${paramIdx}`;
+      params.push(audience);
       paramIdx++;
     }
 
@@ -165,6 +174,7 @@ export class FeedService {
       WHERE p.deleted_at IS NULL
         AND p.user_id = $2
         ${visibilityClause}
+        ${audienceClause}
         ${cursorClause}
       ORDER BY p.created_at DESC
       LIMIT $3
@@ -187,12 +197,13 @@ export class FeedService {
       metadata = {},
       tags = [],
       visibility = 'public',
+      audience = 'global',
     } = data;
 
     const result = await pool.query<Post>(
       `INSERT INTO posts (user_id, content, post_type, media_urls, study_session_id,
-        certification_id, metadata, tags, visibility)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        certification_id, metadata, tags, visibility, audience)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING *`,
       [
         userId,
@@ -204,6 +215,7 @@ export class FeedService {
         JSON.stringify(metadata),
         tags,
         visibility,
+        audience,
       ]
     );
 

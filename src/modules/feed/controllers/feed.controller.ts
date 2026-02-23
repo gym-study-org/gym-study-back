@@ -60,13 +60,14 @@ export class FeedController {
     try {
       const viewerId = req.user!.id;
       const { userId } = req.params;
-      const { limit = 20, cursor } = req.query;
+      const { limit = 20, cursor, audience } = req.query;
 
       const posts = await FeedService.getUserFeed(
         viewerId,
         userId,
         Number(limit),
-        cursor as string | undefined
+        cursor as string | undefined,
+        audience as 'global' | 'personal' | undefined
       );
 
       ResponseUtil.success(res, {

@@ -83,6 +83,22 @@ export class UsersService {
   }
 
   /**
+   * Get public profile by username (resolves to getPublicProfile by ID)
+   */
+  static async getProfileByUsername(username: string, viewerId: string): Promise<UserProfile> {
+    const result = await query(
+      `SELECT id FROM users WHERE username = $1 AND deleted_at IS NULL`,
+      [username]
+    );
+
+    if (result.rows.length === 0) {
+      throw new AppError('Usuário não encontrado', 404, 'USER_NOT_FOUND');
+    }
+
+    return UsersService.getPublicProfile(result.rows[0].id, viewerId);
+  }
+
+  /**
    * Get public profile by user ID (with viewer context for friendship status)
    */
   static async getPublicProfile(userId: string, viewerId: string): Promise<UserProfile> {

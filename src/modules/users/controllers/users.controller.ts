@@ -65,4 +65,20 @@ export class UsersController {
       next(error);
     }
   }
+
+  /**
+   * Get public profile by username
+   * GET /users/by-username/:username/profile
+   */
+  static async getProfileByUsername(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { username } = req.params;
+      const viewerId = req.user!.id;
+
+      const profile = await UsersService.getProfileByUsername(username, viewerId);
+      ResponseUtil.success(res, profile);
+    } catch (error) {
+      next(error);
+    }
+  }
 }

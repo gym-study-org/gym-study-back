@@ -9,13 +9,15 @@ const postTypes = [
   'milestone',
   'code_snippet',
   'poll',
+  'shared_post',
 ] as const;
 
 const visibilities = ['public', 'friends', 'private'] as const;
+const audiences = ['global', 'personal'] as const;
 
 export const createPostSchema = z.object({
   body: z.object({
-    content: z.string().min(1).max(5000),
+    content: z.string().min(0).max(5000),
     post_type: z.enum(postTypes).optional().default('text'),
     media_urls: z.array(z.string().url()).max(10).optional(),
     study_session_id: z.string().uuid().optional(),
@@ -23,6 +25,7 @@ export const createPostSchema = z.object({
     metadata: z.record(z.unknown()).optional(),
     tags: z.array(z.string().max(50)).max(10).optional(),
     visibility: z.enum(visibilities).optional().default('public'),
+    audience: z.enum(audiences).optional().default('global'),
   }),
 });
 
@@ -69,6 +72,7 @@ export const userFeedParamSchema = z.object({
   query: z.object({
     limit: z.coerce.number().int().min(1).max(50).optional().default(20),
     cursor: z.string().optional(),
+    audience: z.enum(audiences).optional(),
   }),
 });
 
