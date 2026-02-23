@@ -36,10 +36,12 @@ const envSchema = z.object({
   RATE_LIMIT_WINDOW_MS: z.string().default('900000'),
   RATE_LIMIT_MAX_REQUESTS: z.string().default('100'),
 
-  // Cloudinary
-  CLOUDINARY_CLOUD_NAME: z.string().optional(),
-  CLOUDINARY_API_KEY: z.string().optional(),
-  CLOUDINARY_API_SECRET: z.string().optional(),
+  // MinIO / S3 Storage
+  MINIO_ENDPOINT: z.string().default('http://gym-study-minio:9000'),
+  MINIO_ACCESS_KEY: z.string().default('gymstudy'),
+  MINIO_SECRET_KEY: z.string().default('gymstudy_secret_2024'),
+  MINIO_BUCKET: z.string().default('gym-study'),
+  MINIO_PUBLIC_URL: z.string().default('http://localhost:9000'),
 });
 
 const parsed = envSchema.safeParse(process.env);

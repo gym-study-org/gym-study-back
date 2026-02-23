@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { UsersController } from './controllers/users.controller';
 import { authenticate } from '../auth/middlewares/authenticate.middleware';
-import { avatarUpload } from '../../config/cloudinary';
+import { avatarUpload } from '../../config/storage';
 
 const router = Router();
 

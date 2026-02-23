@@ -11,6 +11,7 @@ import { setupSocketHandlers } from './websocket/socket.handler';
 import { startAllJobs } from './jobs';
 import { runMigrations } from './database/run-migrations';
 import { startWorkers } from './shared/queue/workers';
+import { initStorage } from './config/storage';
 
 const PORT = parseInt(env.PORT, 10);
 
@@ -78,6 +79,11 @@ runMigrations()
       } catch (err) {
         logger.warn('Socket.io Redis adapter failed, using in-memory adapter:', err);
       }
+
+      // Initialize MinIO storage (create bucket if needed)
+      initStorage().catch((err) => {
+        logger.warn('MinIO storage init failed (avatars may not work):', err);
+      });
 
       // Start BullMQ workers
       try {

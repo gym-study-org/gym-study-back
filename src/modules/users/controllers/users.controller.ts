@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { UsersService } from '../services/users.service';
 import { ResponseUtil } from '../../../shared/utils/response.util';
 import { AppError } from '../../../shared/utils/AppError';
+import { uploadToStorage } from '../../../config/storage';
 
 export class UsersController {
   static async getMe(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -36,8 +37,11 @@ export class UsersController {
         throw new AppError('Nenhum arquivo enviado', 400, 'NO_FILE');
       }
 
-      // Multer-cloudinary storage returns the URL in req.file.path
-      const avatarUrl = (req.file as any).path;
+      const avatarUrl = await uploadToStorage(
+        req.file.buffer,
+        req.file.mimetype,
+        req.file.originalname
+      );
 
       const user = await UsersService.updateAvatarUrl(userId, avatarUrl);
       ResponseUtil.success(res, user, 'Avatar atualizado com sucesso');
