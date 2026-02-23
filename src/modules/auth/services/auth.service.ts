@@ -3,6 +3,7 @@ import { query } from '../../../config/database';
 import { AppError } from '../../../shared/utils/AppError';
 import { RegisterDTO, LoginDTO, AuthResponse } from '../interfaces/auth.interface';
 import { JWTService } from './jwt.service';
+import { updateUserStreak } from '../../../jobs/streak.job';
 
 export class AuthService {
   static async register(data: RegisterDTO): Promise<AuthResponse> {
@@ -40,6 +41,9 @@ export class AuthService {
 
     const token = JWTService.generateAccessToken(tokenPayload);
     const refreshToken = JWTService.generateRefreshToken(tokenPayload);
+
+    // Start streak on registration (async, don't block response)
+    updateUserStreak(user.id).catch(() => {});
 
     return {
       user: {
@@ -102,6 +106,9 @@ export class AuthService {
 
     const token = JWTService.generateAccessToken(tokenPayload);
     const refreshToken = JWTService.generateRefreshToken(tokenPayload);
+
+    // Update streak on daily login (async, don't block response)
+    updateUserStreak(user.id).catch(() => {});
 
     return {
       user: {
