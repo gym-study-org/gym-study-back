@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { query } from '../../../config/database';
-import { AppError } from '../../../shared/middlewares/error-handler.middleware';
+import { AppError } from '../../../shared/utils/AppError';
 import { RegisterDTO, LoginDTO, AuthResponse } from '../interfaces/auth.interface';
 import { JWTService } from './jwt.service';
 
@@ -15,7 +15,7 @@ export class AuthService {
     );
 
     if (existingUser.rows.length > 0) {
-      throw new AppError(400, 'USER_EXISTS', 'Email or username already exists');
+      throw new AppError('Email or username already exists', 400, 'USER_EXISTS');
     }
 
     // Hash password
@@ -67,22 +67,22 @@ export class AuthService {
     );
 
     if (result.rows.length === 0) {
-      throw new AppError(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
+      throw new AppError('Invalid email or password', 401, 'INVALID_CREDENTIALS');
     }
 
     const user = result.rows[0];
 
     // Check if account is active
     if (!user.is_active) {
-      throw new AppError(403, 'ACCOUNT_DISABLED', 'Your account has been disabled');
+      throw new AppError('Your account has been disabled', 403, 'ACCOUNT_DISABLED');
     }
 
     // Check if user has password (not OAuth user)
     if (!user.password_hash) {
       throw new AppError(
+        'This account uses OAuth. Please login with Google or GitHub',
         400,
-        'OAUTH_ACCOUNT',
-        'This account uses OAuth. Please login with Google or GitHub'
+        'OAUTH_ACCOUNT'
       );
     }
 
@@ -90,7 +90,7 @@ export class AuthService {
     const isPasswordValid = await bcrypt.compare(password, user.password_hash);
 
     if (!isPasswordValid) {
-      throw new AppError(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
+      throw new AppError('Invalid email or password', 401, 'INVALID_CREDENTIALS');
     }
 
     // Generate tokens
@@ -128,7 +128,7 @@ export class AuthService {
       );
 
       if (result.rows.length === 0) {
-        throw new AppError(401, 'INVALID_TOKEN', 'User not found or inactive');
+        throw new AppError('User not found or inactive', 401, 'INVALID_TOKEN');
       }
 
       const user = result.rows[0];
@@ -140,7 +140,7 @@ export class AuthService {
 
       return { token: newToken };
     } catch (error) {
-      throw new AppError(401, 'INVALID_TOKEN', 'Invalid or expired refresh token');
+      throw new AppError('Invalid or expired refresh token', 401, 'INVALID_TOKEN');
     }
   }
 }

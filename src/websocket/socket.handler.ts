@@ -72,6 +72,17 @@ export const setupSocketHandlers = (io: Server) => {
       });
     });
 
+    // Handle joining group rooms
+    socket.on('group:join', (groupId: string) => {
+      socket.join(`group:${groupId}`);
+      logger.debug(`User ${userName} joined group room: ${groupId}`);
+    });
+
+    socket.on('group:leave', (groupId: string) => {
+      socket.leave(`group:${groupId}`);
+      logger.debug(`User ${userName} left group room: ${groupId}`);
+    });
+
     // Handle disconnect
     socket.on('disconnect', () => {
       connectedUsers.delete(userId);
@@ -130,6 +141,59 @@ export const emitChallengeUpdate = (
 export const emitRankingUpdate = (io: Server, data: { userId: string; newPosition: number; change: number }) => {
   io.emit('ranking:update', {
     ...data,
+    timestamp: new Date().toISOString(),
+  });
+};
+
+// Feed events
+
+export const emitNewFeedPost = (
+  io: Server,
+  authorId: string,
+  post: { id: string; content: string; post_type: string; author_username: string }
+) => {
+  // Emit to the author's room so their friends can see
+  io.to(`user:${authorId}`).emit('feed:new_post', {
+    post,
+    timestamp: new Date().toISOString(),
+  });
+};
+
+export const emitPostLiked = (
+  io: Server,
+  authorUserId: string,
+  data: { postId: string; likedBy: string; likedByName: string }
+) => {
+  io.to(`user:${authorUserId}`).emit('feed:post_liked', {
+    ...data,
+    timestamp: new Date().toISOString(),
+  });
+};
+
+export const emitPostCommented = (
+  io: Server,
+  authorUserId: string,
+  data: { postId: string; commentBy: string; commentByName: string; preview: string }
+) => {
+  io.to(`user:${authorUserId}`).emit('feed:post_commented', {
+    ...data,
+    timestamp: new Date().toISOString(),
+  });
+};
+
+// Group events
+
+export const emitToGroup = (io: Server, groupId: string, event: string, data: any) => {
+  io.to(`group:${groupId}`).emit(event, data);
+};
+
+export const emitGroupMessage = (
+  io: Server,
+  groupId: string,
+  message: { id: string; user_id: string; content: string; message_type: string; author_username: string; created_at: string }
+) => {
+  io.to(`group:${groupId}`).emit('group:message', {
+    message,
     timestamp: new Date().toISOString(),
   });
 };

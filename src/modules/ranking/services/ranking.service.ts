@@ -1,5 +1,16 @@
 import { pool } from '../../../config/database';
 import { RankingEntry, UserRankingPosition } from '../interfaces/ranking.interface';
+import { getCacheOrFetch, deleteCachePattern } from '../../../shared/utils/cache.util';
+import { redis } from '../../../config/redis';
+import { logger } from '../../../shared/utils/logger.util';
+
+const CACHE_TTL = {
+  GLOBAL: 300, // 5 min
+  FRIENDS: 180, // 3 min
+  MONTHLY: 600, // 10 min
+  WEEKLY: 300, // 5 min
+  POSITION: 180, // 3 min
+};
 
 export class RankingService {
   /**
@@ -10,6 +21,9 @@ export class RankingService {
     limit: number = 50,
     offset: number = 0
   ): Promise<RankingEntry[]> {
+    const cacheKey = `ranking:global:${limit}:${offset}:${userId}`;
+
+    return getCacheOrFetch(cacheKey, async () => {
     const query = `
       WITH ranked_users AS (
         SELECT
@@ -50,12 +64,16 @@ export class RankingService {
 
     const result = await pool.query<RankingEntry>(query, [userId, limit, offset]);
     return result.rows;
+    }, CACHE_TTL.GLOBAL);
   }
 
   /**
    * Get friends ranking
    */
   async getFriendsRanking(userId: string): Promise<RankingEntry[]> {
+    const cacheKey = `ranking:friends:${userId}`;
+
+    return getCacheOrFetch(cacheKey, async () => {
     const query = `
       WITH friends_and_me AS (
         SELECT u.id as user_id
@@ -105,6 +123,7 @@ export class RankingService {
 
     const result = await pool.query<RankingEntry>(query, [userId]);
     return result.rows;
+    }, CACHE_TTL.FRIENDS);
   }
 
   /**
@@ -114,6 +133,9 @@ export class RankingService {
     userId: string,
     limit: number = 50
   ): Promise<RankingEntry[]> {
+    const cacheKey = `ranking:monthly:${limit}:${userId}`;
+
+    return getCacheOrFetch(cacheKey, async () => {
     const query = `
       WITH monthly_stats AS (
         SELECT
@@ -155,6 +177,7 @@ export class RankingService {
 
     const result = await pool.query<RankingEntry>(query, [userId, limit]);
     return result.rows;
+    }, CACHE_TTL.MONTHLY);
   }
 
   /**
@@ -164,6 +187,9 @@ export class RankingService {
     userId: string,
     limit: number = 50
   ): Promise<RankingEntry[]> {
+    const cacheKey = `ranking:weekly:${limit}:${userId}`;
+
+    return getCacheOrFetch(cacheKey, async () => {
     const query = `
       WITH weekly_stats AS (
         SELECT
@@ -198,28 +224,53 @@ export class RankingService {
 
     const result = await pool.query<RankingEntry>(query, [userId, limit]);
     return result.rows;
+    }, CACHE_TTL.WEEKLY);
   }
 
   /**
    * Get user's position in rankings
+   * Uses Redis ZREVRANK as primary source (populated by leaderboard job),
+   * falls back to SQL if Redis data is unavailable.
    */
   async getUserPosition(userId: string): Promise<UserRankingPosition> {
-    // Global position
-    const globalQuery = `
-      WITH ranked AS (
-        SELECT
-          id,
-          ROW_NUMBER() OVER (ORDER BY total_study_hours DESC, created_at ASC) as position
-        FROM users
-      )
-      SELECT position FROM ranked WHERE id = $1
-    `;
-    const globalResult = await pool.query(globalQuery, [userId]);
+    const cacheKey = `ranking:position:${userId}`;
 
-    // Total users
-    const totalUsersResult = await pool.query('SELECT COUNT(*) FROM users');
+    return getCacheOrFetch(cacheKey, async () => {
+    // Try Redis sorted set first (fast O(log N))
+    let globalPosition = 0;
+    let totalUsers = 0;
+    let usedRedis = false;
 
-    // Friends position
+    try {
+      const rank = await redis.zrevrank('leaderboard:global', userId);
+      if (rank !== null) {
+        globalPosition = rank + 1; // ZREVRANK is 0-indexed
+        totalUsers = await redis.zcard('leaderboard:global');
+        usedRedis = true;
+      }
+    } catch (err) {
+      logger.debug('Redis ZSET unavailable for ranking, falling back to SQL');
+    }
+
+    if (!usedRedis) {
+      // SQL fallback
+      const globalQuery = `
+        WITH ranked AS (
+          SELECT
+            id,
+            ROW_NUMBER() OVER (ORDER BY total_study_hours DESC, created_at ASC) as position
+          FROM users
+        )
+        SELECT position FROM ranked WHERE id = $1
+      `;
+      const globalResult = await pool.query(globalQuery, [userId]);
+      const totalUsersResult = await pool.query('SELECT COUNT(*) FROM users');
+
+      globalPosition = parseInt(globalResult.rows[0]?.position || '0', 10);
+      totalUsers = parseInt(totalUsersResult.rows[0]?.count || '0', 10);
+    }
+
+    // Friends position (always SQL since friends are per-user)
     const friendsQuery = `
       WITH friends_and_me AS (
         SELECT u.id as user_id, u.total_study_hours, u.created_at
@@ -248,10 +299,18 @@ export class RankingService {
     const friendsResult = await pool.query(friendsQuery, [userId]);
 
     return {
-      global_position: parseInt(globalResult.rows[0]?.position || '0', 10),
-      total_users: parseInt(totalUsersResult.rows[0]?.count || '0', 10),
+      global_position: globalPosition,
+      total_users: totalUsers,
       friends_position: parseInt(friendsResult.rows[0]?.position || '0', 10),
       total_friends: parseInt(friendsResult.rows[0]?.total || '0', 10),
     };
+    }, CACHE_TTL.POSITION);
   }
+}
+
+/**
+ * Invalidate all ranking caches. Call this when study sessions or friendships change.
+ */
+export async function invalidateRankingCache(): Promise<void> {
+  await deleteCachePattern('ranking:*');
 }

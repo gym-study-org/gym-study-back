@@ -1,5 +1,6 @@
 import { pool } from '../../../config/database';
 import { logger } from '../../../shared/utils/logger.util';
+import { getCacheOrFetch } from '../../../shared/utils/cache.util';
 import {
   BadgeDefinition,
   BadgeLevel,
@@ -15,34 +16,33 @@ import {
   STAT_KEY_MAP,
 } from '../interfaces/badge.interface';
 
-class BadgesService {
-  // Cache for badge definitions (rarely change)
-  private badgeDefinitionsCache: BadgeDefinition[] | null = null;
-  private cacheTimestamp: number = 0;
-  private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const BADGE_CACHE_KEY = 'badges:definitions';
+const BADGE_CACHE_TTL = 1800; // 30 minutes
 
+class BadgesService {
   /**
-   * Get all badge definitions
+   * Get all badge definitions (cached in Redis for 30 minutes)
    */
   async getAllBadgeDefinitions(): Promise<BadgeDefinition[]> {
-    // Check cache
-    if (this.badgeDefinitionsCache && Date.now() - this.cacheTimestamp < this.CACHE_TTL) {
-      return this.badgeDefinitionsCache;
-    }
+    return getCacheOrFetch(BADGE_CACHE_KEY, async () => {
+      const result = await pool.query(`
+        SELECT id, code, name, description, category, icon, stat_key, max_level, levels,
+               verification_requirements, is_hireable_signal, created_at, updated_at
+        FROM badge_definitions
+        ORDER BY category, code
+      `);
 
-    const result = await pool.query(`
-      SELECT id, code, name, description, category, icon, stat_key, max_level, levels, created_at, updated_at
-      FROM badge_definitions
-      ORDER BY category, code
-    `);
-
-    this.badgeDefinitionsCache = result.rows.map((row) => ({
-      ...row,
-      levels: typeof row.levels === 'string' ? JSON.parse(row.levels) : row.levels,
-    }));
-    this.cacheTimestamp = Date.now();
-
-    return this.badgeDefinitionsCache;
+      return result.rows.map((row) => ({
+        ...row,
+        levels: typeof row.levels === 'string' ? JSON.parse(row.levels) : row.levels,
+        verification_requirements: row.verification_requirements
+          ? (typeof row.verification_requirements === 'string'
+            ? JSON.parse(row.verification_requirements)
+            : row.verification_requirements)
+          : null,
+        is_hireable_signal: row.is_hireable_signal || false,
+      }));
+    }, BADGE_CACHE_TTL);
   }
 
   /**
@@ -509,6 +509,164 @@ class BadgesService {
        WHERE id = $1`,
       [userId]
     );
+  }
+
+  // ==================== AUTHORITY / HIREABLE METHODS ====================
+
+  /**
+   * Verify a specific badge for a user (public, no auth required)
+   * Returns badge evidence for companies/recruiters
+   */
+  async verifyBadge(userId: string, badgeCode: string): Promise<{
+    verified: boolean;
+    badge: BadgeDefinition | null;
+    user: { username: string; avatar_url: string | null } | null;
+    level: number;
+    level_info: BadgeLevel | null;
+    evidence: {
+      assessment_score: number | null;
+      study_hours: number;
+      endorsements: number;
+      verified_at: string | null;
+      expires_at: string | null;
+    } | null;
+  }> {
+    const badge = await this.getBadgeByCode(badgeCode);
+    if (!badge) {
+      return { verified: false, badge: null, user: null, level: 0, level_info: null, evidence: null };
+    }
+
+    const userResult = await pool.query(
+      'SELECT username, avatar_url FROM users WHERE id = $1 AND deleted_at IS NULL',
+      [userId]
+    );
+    if (userResult.rows.length === 0) {
+      return { verified: false, badge, user: null, level: 0, level_info: null, evidence: null };
+    }
+    const user = userResult.rows[0];
+
+    const userBadgeResult = await pool.query(
+      'SELECT current_level, current_value FROM user_badges WHERE user_id = $1 AND badge_id = $2',
+      [userId, badge.id]
+    );
+
+    if (userBadgeResult.rows.length === 0 || userBadgeResult.rows[0].current_level === 0) {
+      return { verified: false, badge, user, level: 0, level_info: null, evidence: null };
+    }
+
+    const level = userBadgeResult.rows[0].current_level;
+    const levelInfo = badge.levels.find((l) => l.level === level) || null;
+
+    // Gather evidence for skill badges
+    let assessmentScore: number | null = null;
+    let endorsements = 0;
+    let verifiedAt: string | null = null;
+    let expiresAt: string | null = null;
+
+    if (badge.category === 'skills') {
+      // Get skill code from badge code (e.g., skill_javascript -> javascript)
+      const skillCode = badgeCode.replace('skill_', '');
+      const vsResult = await pool.query(
+        `SELECT vs.score, vs.endorsement_count, vs.verified_at, vs.expires_at
+         FROM verified_skills vs
+         JOIN skill_categories sc ON sc.id = vs.skill_category_id
+         WHERE vs.user_id = $1 AND sc.code = $2 AND vs.is_active = true
+         LIMIT 1`,
+        [userId, skillCode]
+      );
+      if (vsResult.rows.length > 0) {
+        assessmentScore = parseFloat(vsResult.rows[0].score);
+        endorsements = vsResult.rows[0].endorsement_count;
+        verifiedAt = vsResult.rows[0].verified_at;
+        expiresAt = vsResult.rows[0].expires_at;
+      }
+    }
+
+    const statsResult = await pool.query(
+      'SELECT COALESCE(total_study_hours, 0) AS total_study_hours FROM users WHERE id = $1',
+      [userId]
+    );
+
+    return {
+      verified: true,
+      badge,
+      user,
+      level,
+      level_info: levelInfo,
+      evidence: {
+        assessment_score: assessmentScore,
+        study_hours: parseFloat(statsResult.rows[0]?.total_study_hours || '0'),
+        endorsements,
+        verified_at: verifiedAt,
+        expires_at: expiresAt,
+      },
+    };
+  }
+
+  /**
+   * Get all hireable-signal badges for a user (public)
+   */
+  async getHireableBadges(userId: string): Promise<Array<{
+    badge: BadgeDefinition;
+    level: number;
+    level_info: BadgeLevel | null;
+    assessment_score: number | null;
+    endorsements: number;
+  }>> {
+    const badges = await this.getAllBadgeDefinitions();
+    const hireableBadges = badges.filter((b) => b.is_hireable_signal);
+
+    if (hireableBadges.length === 0) return [];
+
+    const badgeIds = hireableBadges.map((b) => b.id);
+    const userBadgesResult = await pool.query(
+      `SELECT badge_id, current_level FROM user_badges
+       WHERE user_id = $1 AND badge_id = ANY($2) AND current_level > 0`,
+      [userId, badgeIds]
+    );
+
+    const userBadgesMap = new Map(
+      userBadgesResult.rows.map((r) => [r.badge_id, r.current_level])
+    );
+
+    // Get verified skills for enrichment
+    const vsResult = await pool.query(
+      `SELECT sc.code, vs.score, vs.endorsement_count
+       FROM verified_skills vs
+       JOIN skill_categories sc ON sc.id = vs.skill_category_id
+       WHERE vs.user_id = $1 AND vs.is_active = true`,
+      [userId]
+    );
+    const vsMap = new Map(
+      vsResult.rows.map((r) => [r.code, { score: parseFloat(r.score), endorsements: r.endorsement_count }])
+    );
+
+    const results: Array<{
+      badge: BadgeDefinition;
+      level: number;
+      level_info: BadgeLevel | null;
+      assessment_score: number | null;
+      endorsements: number;
+    }> = [];
+
+    for (const badge of hireableBadges) {
+      const level = userBadgesMap.get(badge.id) || 0;
+      if (level === 0) continue;
+
+      const levelInfo = badge.levels.find((l) => l.level === level) || null;
+      const skillCode = badge.code.replace('skill_', '');
+      const vsData = vsMap.get(skillCode);
+
+      results.push({
+        badge,
+        level,
+        level_info: levelInfo,
+        assessment_score: vsData?.score ?? null,
+        endorsements: vsData?.endorsements ?? 0,
+      });
+    }
+
+    return results.sort((a, b) => b.level - a.level);
   }
 }
 

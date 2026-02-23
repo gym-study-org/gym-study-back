@@ -4,7 +4,14 @@ import { authenticate } from '../auth/middlewares/authenticate.middleware';
 
 const router = Router();
 
-// All routes require authentication
+// === Public endpoints (no auth) ===
+// GET /badges/verify/:userId/:badgeCode - Verify a badge (for companies/recruiters)
+router.get('/verify/:userId/:badgeCode', badgesController.verifyBadge);
+
+// GET /badges/user/:userId/hireable - Hireable-signal badges
+router.get('/user/:userId/hireable', badgesController.getHireableBadges);
+
+// === Authenticated endpoints ===
 router.use(authenticate);
 
 // GET /badges - Get all badge definitions

@@ -1,5 +1,5 @@
 import { query } from '../../../config/database';
-import { AppError } from '../../../shared/middlewares/error-handler.middleware';
+import { AppError } from '../../../shared/utils/AppError';
 import { UserProfile } from '../interfaces/user.interface';
 
 export class UsersService {
@@ -14,7 +14,7 @@ export class UsersService {
     );
 
     if (result.rows.length === 0) {
-      throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
+      throw new AppError('User not found', 404, 'USER_NOT_FOUND');
     }
 
     return result.rows[0];
@@ -43,7 +43,7 @@ export class UsersService {
     }
 
     if (updates.length === 0) {
-      throw new AppError(400, 'NO_UPDATES', 'No fields to update');
+      throw new AppError('No fields to update', 400, 'NO_UPDATES');
     }
 
     values.push(id);
@@ -57,7 +57,7 @@ export class UsersService {
     );
 
     if (result.rows.length === 0) {
-      throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
+      throw new AppError('User not found', 404, 'USER_NOT_FOUND');
     }
 
     return result.rows[0];
@@ -76,7 +76,7 @@ export class UsersService {
     );
 
     if (result.rows.length === 0) {
-      throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
+      throw new AppError('User not found', 404, 'USER_NOT_FOUND');
     }
 
     return result.rows[0];
@@ -97,7 +97,7 @@ export class UsersService {
     );
 
     if (userResult.rows.length === 0) {
-      throw new AppError(404, 'USER_NOT_FOUND', 'Usuario nao encontrado');
+      throw new AppError('Usuario nao encontrado', 404, 'USER_NOT_FOUND');
     }
 
     const user = userResult.rows[0];

@@ -179,6 +179,48 @@ class BadgesController {
       });
     }
   }
+
+  /**
+   * GET /badges/verify/:userId/:badgeCode
+   * Public endpoint - verify a badge (no auth required)
+   */
+  async verifyBadge(req: Request, res: Response): Promise<void> {
+    try {
+      const { userId, badgeCode } = req.params;
+      const result = await badgesService.verifyBadge(userId, badgeCode);
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      logger.error('Error verifying badge:', error);
+      res.status(500).json({
+        success: false,
+        error: { code: 'INTERNAL_ERROR', message: 'Failed to verify badge' },
+      });
+    }
+  }
+
+  /**
+   * GET /badges/user/:userId/hireable
+   * Public endpoint - get hireable badges for a user
+   */
+  async getHireableBadges(req: Request, res: Response): Promise<void> {
+    try {
+      const { userId } = req.params;
+      const badges = await badgesService.getHireableBadges(userId);
+      res.json({
+        success: true,
+        data: badges,
+      });
+    } catch (error) {
+      logger.error('Error getting hireable badges:', error);
+      res.status(500).json({
+        success: false,
+        error: { code: 'INTERNAL_ERROR', message: 'Failed to get hireable badges' },
+      });
+    }
+  }
 }
 
 export const badgesController = new BadgesController();

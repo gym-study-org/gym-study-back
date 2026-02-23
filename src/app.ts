@@ -18,6 +18,20 @@ import rankingRoutes from './modules/ranking/ranking.routes';
 import challengesRoutes from './modules/challenges/challenges.routes';
 import achievementsRoutes from './modules/achievements/achievements.routes';
 import badgesRoutes from './modules/badges/badges.routes';
+import feedRoutes from './modules/feed/feed.routes';
+import assessmentsRoutes from './modules/assessments/assessments.routes';
+import notificationsRoutes from './modules/notifications/notifications.routes';
+import githubRoutes from './modules/github/github.routes';
+import publicRoutes from './modules/public/public.routes';
+import xpRoutes from './modules/xp/xp.routes';
+import leaguesRoutes from './modules/leagues/leagues.routes';
+import streakRoutes from './modules/streak/streak.routes';
+import questsRoutes from './modules/quests/quests.routes';
+import gemsRoutes from './modules/gems/gems.routes';
+import groupsRoutes from './modules/groups/groups.routes';
+import storiesRoutes from './modules/stories/stories.routes';
+import recommendationsRoutes from './modules/recommendations/recommendations.routes';
+import articlesRoutes from './modules/articles/articles.routes';
 
 export const createApp = (): Application => {
   const app = express();
@@ -65,6 +79,20 @@ export const createApp = (): Application => {
   app.use('/api/challenges', challengesRoutes);
   app.use('/api/achievements', achievementsRoutes);
   app.use('/api/badges', badgesRoutes);
+  app.use('/api/feed', feedRoutes);
+  app.use('/api/assessments', assessmentsRoutes);
+  app.use('/api/notifications', notificationsRoutes);
+  app.use('/api/github', githubRoutes);
+  app.use('/api/public', publicRoutes);
+  app.use('/api/xp', xpRoutes);
+  app.use('/api/leagues', leaguesRoutes);
+  app.use('/api/streak', streakRoutes);
+  app.use('/api/quests', questsRoutes);
+  app.use('/api/gems', gemsRoutes);
+  app.use('/api/groups', groupsRoutes);
+  app.use('/api/stories', storiesRoutes);
+  app.use('/api/recommendations', recommendationsRoutes);
+  app.use('/api/articles', articlesRoutes);
 
   // 404 handler
   app.use((_req, res) => {

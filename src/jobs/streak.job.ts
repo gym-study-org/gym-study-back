@@ -8,40 +8,50 @@ export const startStreakJob = () => {
     logger.info('Running streak reset job...');
 
     try {
+      // Reset streak_freeze_used_today for all users
+      await pool.query('UPDATE users SET streak_freeze_used_today = false WHERE streak_freeze_used_today = true');
+
       // Get yesterday's date
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
       yesterday.setHours(0, 0, 0, 0);
 
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      // Reset streak for users who didn't study yesterday
-      // Only reset if last_study_date is before yesterday
-      const result = await pool.query(
-        `UPDATE users
-         SET current_streak = 0
+      // Find users who didn't study yesterday and have an active streak
+      const usersToReset = await pool.query(
+        `SELECT id, username, current_streak, streak_freezes_available
+         FROM users
          WHERE last_study_date IS NOT NULL
          AND last_study_date < $1
-         AND current_streak > 0
-         RETURNING id, username, current_streak`,
+         AND current_streak > 0`,
         [yesterday]
       );
 
-      if (result.rows.length > 0) {
-        logger.info(
-          `Streak reset for ${result.rows.length} users: ${result.rows
-            .map((u) => u.username)
-            .join(', ')}`
+      let freezesUsed = 0;
+      let streaksReset = 0;
+
+      for (const user of usersToReset.rows) {
+        // Try to use a freeze first
+        if (user.streak_freezes_available > 0) {
+          const { StreakService } = await import('../modules/streak/services/streak.service');
+          const used = await StreakService.useFreeze(user.id);
+          if (used) {
+            freezesUsed++;
+            logger.debug(`Streak freeze used for user ${user.username}`);
+            continue;
+          }
+        }
+
+        // No freeze available — reset streak
+        await pool.query(
+          'UPDATE users SET current_streak = 0 WHERE id = $1',
+          [user.id]
         );
-      } else {
-        logger.info('No streaks needed to be reset');
+        streaksReset++;
       }
 
-      // Update streaks for users who studied yesterday (increment if they studied today too)
-      // This is handled by the study-sessions service when creating a session
-
-      logger.info('Streak reset job completed');
+      logger.info(
+        `Streak job completed: ${streaksReset} streaks reset, ${freezesUsed} freezes used`
+      );
     } catch (error) {
       logger.error('Error in streak reset job:', error);
     }
@@ -110,6 +120,12 @@ export const updateUserStreak = async (userId: string): Promise<void> => {
 
     logger.debug(
       `Updated streak for user ${userId}: current=${newStreak}, longest=${newLongestStreak}`
+    );
+
+    // Check for streak milestones (async, don't block)
+    const { StreakService } = await import('../modules/streak/services/streak.service');
+    StreakService.checkMilestones(userId, newStreak).catch(err =>
+      logger.error('Error checking streak milestones:', err)
     );
   } catch (error) {
     logger.error('Error updating user streak:', error);

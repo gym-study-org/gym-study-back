@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { UsersService } from '../services/users.service';
 import { ResponseUtil } from '../../../shared/utils/response.util';
-import { AppError } from '../../../shared/middlewares/error-handler.middleware';
+import { AppError } from '../../../shared/utils/AppError';
 
 export class UsersController {
   static async getMe(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -33,7 +33,7 @@ export class UsersController {
       const userId = req.user!.id;
 
       if (!req.file) {
-        throw new AppError(400, 'NO_FILE', 'Nenhum arquivo enviado');
+        throw new AppError('Nenhum arquivo enviado', 400, 'NO_FILE');
       }
 
       // Multer-cloudinary storage returns the URL in req.file.path

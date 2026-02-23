@@ -7,6 +7,8 @@ import {
 import { AppError } from '../../../shared/utils/AppError';
 import { checkAndEmitAchievements } from '../../achievements/controllers/achievements.controller';
 import { logger } from '../../../shared/utils/logger.util';
+import { invalidateRankingCache } from '../../ranking/services/ranking.service';
+import { NotificationService } from '../../notifications/services/notification.service';
 
 export class FriendshipsService {
   /**
@@ -52,6 +54,21 @@ export class FriendshipsService {
     `;
 
     const result = await pool.query<Friendship>(query, [requesterId, addresseeId]);
+
+    // Get requester name for notification
+    const requesterResult = await pool.query('SELECT username FROM users WHERE id = $1', [requesterId]);
+    const requesterName = requesterResult.rows[0]?.username || 'Someone';
+
+    NotificationService.createNotification({
+      user_id: addresseeId,
+      actor_id: requesterId,
+      type: 'friendship_request',
+      title: 'New friend request',
+      body: `${requesterName} sent you a friend request`,
+      reference_type: 'friendship',
+      reference_id: result.rows[0].id,
+    }).catch((err) => logger.error('Error creating friendship request notification:', err));
+
     return result.rows[0];
   }
 
@@ -95,7 +112,7 @@ export class FriendshipsService {
     const result = await pool.query<Friendship>(query, [status, friendshipId]);
     const updatedFriendship = result.rows[0];
 
-    // If accepted, check social achievements for both users
+    // If accepted, check social achievements for both users and invalidate ranking cache
     if (status === 'accepted') {
       checkAndEmitAchievements(userId, 'social').catch((err) =>
         logger.error('Error checking social achievements:', err)
@@ -103,6 +120,23 @@ export class FriendshipsService {
       checkAndEmitAchievements(request.requester_id, 'social').catch((err) =>
         logger.error('Error checking social achievements:', err)
       );
+      invalidateRankingCache().catch((err) =>
+        logger.error('Error invalidating ranking cache:', err)
+      );
+
+      // Notify the requester that their request was accepted
+      const accepterResult = await pool.query('SELECT username FROM users WHERE id = $1', [userId]);
+      const accepterName = accepterResult.rows[0]?.username || 'Someone';
+
+      NotificationService.createNotification({
+        user_id: request.requester_id,
+        actor_id: userId,
+        type: 'friendship_accepted',
+        title: 'Friend request accepted',
+        body: `${accepterName} accepted your friend request`,
+        reference_type: 'friendship',
+        reference_id: friendshipId,
+      }).catch((err) => logger.error('Error creating friendship accepted notification:', err));
     }
 
     return updatedFriendship;

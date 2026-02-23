@@ -7,7 +7,8 @@ export type BadgeCategory =
   | 'certifications'
   | 'goals'
   | 'sessions'
-  | 'special';
+  | 'special'
+  | 'skills';
 
 export interface BadgeLevel {
   level: number;
@@ -27,8 +28,16 @@ export interface BadgeDefinition {
   stat_key: string;
   max_level: number;
   levels: BadgeLevel[];
+  verification_requirements: VerificationRequirements | null;
+  is_hireable_signal: boolean;
   created_at: Date;
   updated_at: Date;
+}
+
+export interface VerificationRequirements {
+  assessment_min_score: number;
+  endorsements_required: number[];
+  study_hours_required: number[];
 }
 
 export interface UserBadge {
@@ -114,6 +123,7 @@ export const CATEGORY_LABELS: Record<BadgeCategory, string> = {
   goals: 'Metas',
   sessions: 'Sessões',
   special: 'Especiais',
+  skills: 'Competências Verificadas',
 };
 
 export const CATEGORY_ICONS: Record<BadgeCategory, string> = {
@@ -124,6 +134,7 @@ export const CATEGORY_ICONS: Record<BadgeCategory, string> = {
   goals: 'Target',
   sessions: 'Swords',
   special: 'Sparkles',
+  skills: 'ShieldCheck',
 };
 
 // Stat key to user property mapping

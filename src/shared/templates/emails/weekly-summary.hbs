@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; margin: 0; padding: 20px; }
+    .container { max-width: 600px; margin: 0 auto; background: #1A1A2E; color: #e0e0e0; border-radius: 12px; overflow: hidden; }
+    .header { background: #16213E; padding: 30px; text-align: center; }
+    .header h1 { color: #00B4D8; margin: 0; font-size: 24px; }
+    .content { padding: 30px; }
+    .stats-grid { display: flex; flex-wrap: wrap; gap: 16px; margin: 20px 0; }
+    .stat-card { background: #16213E; padding: 20px; border-radius: 8px; text-align: center; flex: 1; min-width: 120px; }
+    .stat-value { font-size: 32px; font-weight: bold; color: #00B4D8; }
+    .stat-label { font-size: 12px; color: #90E0EF; text-transform: uppercase; margin-top: 4px; }
+    .streak-card .stat-value { color: #F59E0B; }
+    .btn { display: inline-block; background: #0F3460; color: #fff; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; margin: 20px 0; }
+    .footer { padding: 20px 30px; text-align: center; color: #888; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Your Weekly Summary</h1>
+    </div>
+    <div class="content">
+      <p>Hey {{username}}, here is what you accomplished this week:</p>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value">{{total_hours}}</div>
+          <div class="stat-label">Hours Studied</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">{{total_sessions}}</div>
+          <div class="stat-label">Sessions</div>
+        </div>
+        <div class="stat-card streak-card">
+          <div class="stat-value">{{streak}}</div>
+          <div class="stat-label">Day Streak</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">{{badges_earned}}</div>
+          <div class="stat-label">Badges Earned</div>
+        </div>
+      </div>
+      <a href="{{frontendUrl}}" class="btn">Keep Going</a>
+    </div>
+    <div class="footer">
+      <p>GYM-STUDY - Your weekly progress report</p>
+    </div>
+  </div>
+</body>
+</html>

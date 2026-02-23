@@ -1,5 +1,5 @@
 import { query } from '../../../config/database';
-import { AppError } from '../../../shared/middlewares/error-handler.middleware';
+import { AppError } from '../../../shared/utils/AppError';
 import {
   CreateStudySessionDTO,
   UpdateStudySessionDTO,
@@ -11,6 +11,8 @@ import { updateUserStreak } from '../../../jobs/streak.job';
 import { checkAndEmitAchievements } from '../../achievements/controllers/achievements.controller';
 import { achievementsService } from '../../achievements/services/achievements.service';
 import { logger } from '../../../shared/utils/logger.util';
+import { invalidateRankingCache } from '../../ranking/services/ranking.service';
+import { XPService } from '../../xp/services/xp.service';
 
 export class StudySessionsService {
   static async create(userId: string, data: CreateStudySessionDTO): Promise<StudySession> {
@@ -73,6 +75,26 @@ export class StudySessionsService {
       logger.error('Error checking night owl achievement:', err)
     );
 
+    // Invalidate ranking caches
+    invalidateRankingCache().catch((err) =>
+      logger.error('Error invalidating ranking cache:', err)
+    );
+
+    // Award XP for study session (async, don't block response)
+    XPService.awardStudySessionXP(userId, session.id, duration_minutes).catch((err) =>
+      logger.error('Error awarding study session XP:', err)
+    );
+
+    // Update daily quests (async, don't block response)
+    import('../../quests/services/quests.service').then(({ QuestsService }) => {
+      QuestsService.updateProgress(userId, 'study_minutes', duration_minutes).catch((err) =>
+        logger.error('Error updating study_minutes quest:', err)
+      );
+      QuestsService.updateProgress(userId, 'study_sessions', 1).catch((err) =>
+        logger.error('Error updating study_sessions quest:', err)
+      );
+    }).catch(() => {});
+
     return session;
   }
 
@@ -108,7 +130,7 @@ export class StudySessionsService {
     );
 
     if (result.rows.length === 0) {
-      throw new AppError(404, 'SESSION_NOT_FOUND', 'Study session not found');
+      throw new AppError('Study session not found', 404, 'SESSION_NOT_FOUND');
     }
 
     return result.rows[0];
@@ -156,7 +178,7 @@ export class StudySessionsService {
     }
 
     if (updates.length === 0) {
-      throw new AppError(400, 'NO_UPDATES', 'No fields to update');
+      throw new AppError('No fields to update', 400, 'NO_UPDATES');
     }
 
     values.push(id, userId);
@@ -170,7 +192,7 @@ export class StudySessionsService {
     );
 
     if (result.rows.length === 0) {
-      throw new AppError(404, 'SESSION_NOT_FOUND', 'Study session not found');
+      throw new AppError('Study session not found', 404, 'SESSION_NOT_FOUND');
     }
 
     return result.rows[0];
@@ -183,7 +205,7 @@ export class StudySessionsService {
     ]);
 
     if (result.rowCount === 0) {
-      throw new AppError(404, 'SESSION_NOT_FOUND', 'Study session not found');
+      throw new AppError('Study session not found', 404, 'SESSION_NOT_FOUND');
     }
   }
 

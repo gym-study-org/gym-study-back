@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { JWTService } from '../services/jwt.service';
 import { ResponseUtil } from '../../../shared/utils/response.util';
 import { query } from '../../../config/database';
+import { redis } from '../../../config/redis';
 
 export const authenticate = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -19,6 +20,17 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
     }
 
     const token = authHeader.split(' ')[1];
+
+    // Check token blacklist (logged-out tokens)
+    try {
+      const isBlacklisted = await redis.get(`blacklist:${token}`);
+      if (isBlacklisted) {
+        ResponseUtil.error(res, 'TOKEN_REVOKED', 'Token has been revoked', 401);
+        return;
+      }
+    } catch {
+      // Redis unavailable, skip blacklist check
+    }
 
     // Verify token
     const payload = JWTService.verifyToken(token);

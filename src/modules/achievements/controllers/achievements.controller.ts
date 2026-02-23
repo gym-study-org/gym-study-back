@@ -151,28 +151,35 @@ export const achievementsController = {
   },
 };
 
-// Helper function to check and emit achievements from other services
+// Helper function to check achievements from other services
+// Uses BullMQ queue for async processing with direct fallback
 export const checkAndEmitAchievements = async (
   userId: string,
   category?: string
 ) => {
   try {
-    const unlockedAchievements = await achievementsService.checkAndUnlockAchievements(
-      userId,
-      category as any
-    );
+    const { enqueueAchievementCheck } = await import('../../../shared/queue/queues');
+    await enqueueAchievementCheck(userId, category);
+  } catch {
+    // Fallback to direct processing if queue is unavailable
+    try {
+      const unlockedAchievements = await achievementsService.checkAndUnlockAchievements(
+        userId,
+        category as any
+      );
 
-    // Emit WebSocket events for each unlocked achievement
-    for (const achievement of unlockedAchievements) {
-      emitToUser(io, userId, 'achievement:unlocked', {
-        achievement,
-        timestamp: new Date().toISOString(),
-      });
+      for (const achievement of unlockedAchievements) {
+        emitToUser(io, userId, 'achievement:unlocked', {
+          achievement,
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      return unlockedAchievements;
+    } catch (fallbackError) {
+      logger.error('Error in checkAndEmitAchievements:', fallbackError);
+      return [];
     }
-
-    return unlockedAchievements;
-  } catch (error) {
-    logger.error('Error in checkAndEmitAchievements:', error);
-    return [];
   }
+  return [];
 };

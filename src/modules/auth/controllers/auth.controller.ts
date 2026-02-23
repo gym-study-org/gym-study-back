@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
+import jwt from 'jsonwebtoken';
 import { AuthService } from '../services/auth.service';
 import { ResponseUtil } from '../../../shared/utils/response.util';
+import { redis } from '../../../config/redis';
 
 export class AuthController {
   static async register(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -37,9 +39,22 @@ export class AuthController {
     }
   }
 
-  static async logout(_req: Request, res: Response): Promise<void> {
-    // For JWT, logout is handled client-side by removing the token
-    // In the future, we can implement token blacklisting with Redis
+  static async logout(req: Request, res: Response): Promise<void> {
+    const authHeader = req.headers.authorization;
+    if (authHeader?.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1];
+      try {
+        const decoded = jwt.decode(token) as { exp?: number } | null;
+        if (decoded?.exp) {
+          const ttl = decoded.exp - Math.floor(Date.now() / 1000);
+          if (ttl > 0) {
+            await redis.setex(`blacklist:${token}`, ttl, '1');
+          }
+        }
+      } catch {
+        // Token decode failed, still return success
+      }
+    }
     ResponseUtil.success(res, null, 'Logout successful');
   }
 }

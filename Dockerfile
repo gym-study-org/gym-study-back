@@ -29,6 +29,9 @@ COPY --from=builder /app/package*.json ./
 # Copy migrations (SQL files)
 COPY --from=builder /app/src/database/migrations ./dist/database/migrations
 
+# Copy email templates (Handlebars files)
+COPY --from=builder /app/src/shared/templates ./dist/shared/templates
+
 # Create logs directory
 RUN mkdir -p logs
 
