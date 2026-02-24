@@ -152,11 +152,15 @@ export class LeaguesService {
   }
 
   /**
-   * Sync weekly_xp from users table into league_memberships
-   * Called periodically or when XP is awarded
+   * Sync weekly_xp from users table into league_memberships.
+   * Creates membership for current week if one doesn't exist yet, so XP
+   * earned before the user first visits the leagues page is not lost.
+   * Called whenever XP is awarded.
    */
   static async syncUserXP(userId: string): Promise<void> {
     const seasonWeek = getSeasonWeek();
+    // Ensure membership row exists before updating it
+    await this.getOrCreateMembership(userId, seasonWeek);
     await query(
       `UPDATE league_memberships lm
        SET weekly_xp = u.weekly_xp

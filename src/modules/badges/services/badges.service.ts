@@ -1,6 +1,7 @@
 import { pool } from '../../../config/database';
 import { logger } from '../../../shared/utils/logger.util';
 import { getCacheOrFetch } from '../../../shared/utils/cache.util';
+import { emitToUserGlobal } from '../../../websocket/socket.handler';
 import {
   BadgeDefinition,
   BadgeLevel,
@@ -54,20 +55,24 @@ class BadgesService {
   }
 
   /**
-   * Get user stats from users table
+   * Get user stats for badge evaluation.
+   * Uses live subqueries instead of denormalized columns that may not exist.
    */
   async getUserStats(userId: string): Promise<UserStats> {
     const result = await pool.query(
       `SELECT
-        COALESCE(total_study_hours, 0) as total_study_hours,
-        COALESCE(current_streak, 0) as current_streak,
-        COALESCE(longest_streak, 0) as longest_streak,
-        COALESCE(sessions_count, 0) as sessions_count,
-        COALESCE(certifications_count, 0) as certifications_count,
-        COALESCE(completed_goals_count, 0) as completed_goals_count,
-        COALESCE(friends_count, 0) as friends_count
-      FROM users
-      WHERE id = $1`,
+        COALESCE(u.total_study_hours, 0)::numeric                            AS total_study_hours,
+        COALESCE(u.current_streak, 0)                                        AS current_streak,
+        COALESCE(u.longest_streak, 0)                                        AS longest_streak,
+        (SELECT COUNT(*) FROM study_sessions   WHERE user_id = u.id)::int    AS sessions_count,
+        (SELECT COUNT(*) FROM certifications   WHERE user_id = u.id)::int    AS certifications_count,
+        (SELECT COUNT(*) FROM goals            WHERE user_id = u.id
+                                               AND status = 'completed')::int AS completed_goals_count,
+        (SELECT COUNT(*) FROM friendships
+          WHERE (requester_id = u.id OR addressee_id = u.id)
+            AND status = 'accepted')::int                                     AS friends_count
+      FROM users u
+      WHERE u.id = $1`,
       [userId]
     );
 
@@ -218,6 +223,11 @@ class BadgesService {
       // Update user's total points if there were level ups
       if (levelUpEvents.length > 0) {
         await this.updateUserTotalPoints(userId);
+
+        // Emit WebSocket events for each level-up
+        for (const levelUp of levelUpEvents) {
+          this.emitLevelUp(userId, levelUp);
+        }
       }
 
       return levelUpEvents;
@@ -368,7 +378,7 @@ class BadgesService {
       [userId]
     );
 
-    return {
+    const event: BadgeLevelUpEvent = {
       badge,
       from_level: previousLevel,
       to_level: newLevel,
@@ -376,6 +386,11 @@ class BadgesService {
       points_earned: pointsEarned,
       new_total_points: parseInt(totalPointsResult.rows[0].total),
     };
+
+    // Emit WebSocket so frontend shows the confetti toast immediately
+    this.emitLevelUp(userId, event);
+
+    return event;
   }
 
   /**
@@ -420,6 +435,25 @@ class BadgesService {
   }
 
   // ==================== HELPER METHODS ====================
+
+  /** Emit badge:levelup WebSocket event to the user */
+  private emitLevelUp(userId: string, levelUp: BadgeLevelUpEvent): void {
+    emitToUserGlobal(userId, 'badge:levelup', {
+      badge: {
+        id: levelUp.badge.id,
+        code: levelUp.badge.code,
+        name: levelUp.badge.name,
+        icon: levelUp.badge.icon,
+        category: levelUp.badge.category,
+      },
+      from_level: levelUp.from_level,
+      to_level: levelUp.to_level,
+      level_info: levelUp.level_info,
+      points_earned: levelUp.points_earned,
+      new_total_points: levelUp.new_total_points,
+      timestamp: new Date().toISOString(),
+    });
+  }
 
   private getCurrentValueForBadge(badge: BadgeDefinition, userStats: UserStats): number {
     const statKey = STAT_KEY_MAP[badge.stat_key];

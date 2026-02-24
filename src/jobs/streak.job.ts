@@ -127,6 +127,12 @@ export const updateUserStreak = async (userId: string): Promise<void> => {
     StreakService.checkMilestones(userId, newStreak).catch(err =>
       logger.error('Error checking streak milestones:', err)
     );
+
+    // Check streak badges (async, don't block)
+    const { badgesService } = await import('../modules/badges/services/badges.service');
+    badgesService.checkAndUpdateBadges(userId, 'streak').catch(err =>
+      logger.error('Error checking streak badges:', err)
+    );
   } catch (error) {
     logger.error('Error updating user streak:', error);
   }

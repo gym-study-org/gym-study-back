@@ -13,6 +13,7 @@ import { achievementsService } from '../../achievements/services/achievements.se
 import { logger } from '../../../shared/utils/logger.util';
 import { invalidateRankingCache } from '../../ranking/services/ranking.service';
 import { XPService } from '../../xp/services/xp.service';
+import { badgesService } from '../../badges/services/badges.service';
 
 export class StudySessionsService {
   static async create(userId: string, data: CreateStudySessionDTO): Promise<StudySession> {
@@ -84,6 +85,33 @@ export class StudySessionsService {
     XPService.awardStudySessionXP(userId, session.id, duration_minutes).catch((err) =>
       logger.error('Error awarding study session XP:', err)
     );
+
+    // Check badges for study-related categories (async, don't block response)
+    badgesService.checkAndUpdateBadges(userId, 'study_hours').catch((err) =>
+      logger.error('Error checking study_hours badges:', err)
+    );
+    badgesService.checkAndUpdateBadges(userId, 'sessions').catch((err) =>
+      logger.error('Error checking sessions badges:', err)
+    );
+
+    // Special time-based badges
+    const hour = sessionTime.getHours();
+    const dayOfWeek = sessionTime.getDay(); // 0=Sun, 6=Sat
+    if (hour >= 5 && hour < 8) {
+      badgesService.checkSpecialBadge(userId, 'early_bird', 1).catch((err) =>
+        logger.error('Error checking early_bird badge:', err)
+      );
+    }
+    if (hour >= 23 || hour < 3) {
+      badgesService.checkSpecialBadge(userId, 'night_owl', 1).catch((err) =>
+        logger.error('Error checking night_owl badge:', err)
+      );
+    }
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      badgesService.checkSpecialBadge(userId, 'weekend_warrior', 1).catch((err) =>
+        logger.error('Error checking weekend_warrior badge:', err)
+      );
+    }
 
     // Update daily quests (async, don't block response)
     import('../../quests/services/quests.service').then(({ QuestsService }) => {

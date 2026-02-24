@@ -9,6 +9,7 @@ import { checkAndEmitAchievements } from '../../achievements/controllers/achieve
 import { logger } from '../../../shared/utils/logger.util';
 import { invalidateRankingCache } from '../../ranking/services/ranking.service';
 import { NotificationService } from '../../notifications/services/notification.service';
+import { badgesService } from '../../badges/services/badges.service';
 
 export class FriendshipsService {
   /**
@@ -112,13 +113,19 @@ export class FriendshipsService {
     const result = await pool.query<Friendship>(query, [status, friendshipId]);
     const updatedFriendship = result.rows[0];
 
-    // If accepted, check social achievements for both users and invalidate ranking cache
+    // If accepted, check social achievements + badges for both users
     if (status === 'accepted') {
       checkAndEmitAchievements(userId, 'social').catch((err) =>
         logger.error('Error checking social achievements:', err)
       );
       checkAndEmitAchievements(request.requester_id, 'social').catch((err) =>
         logger.error('Error checking social achievements:', err)
+      );
+      badgesService.checkAndUpdateBadges(userId, 'social').catch((err) =>
+        logger.error('Error checking social badges:', err)
+      );
+      badgesService.checkAndUpdateBadges(request.requester_id, 'social').catch((err) =>
+        logger.error('Error checking social badges for requester:', err)
       );
       invalidateRankingCache().catch((err) =>
         logger.error('Error invalidating ranking cache:', err)
