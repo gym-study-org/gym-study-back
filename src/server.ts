@@ -7,7 +7,7 @@ import { env } from './config/environment';
 import { pool } from './config/database';
 import { redis } from './config/redis';
 import { logger } from './shared/utils/logger.util';
-import { setupSocketHandlers } from './websocket/socket.handler';
+import { setupSocketHandlers, setGlobalIO } from './websocket/socket.handler';
 import { startAllJobs } from './jobs';
 import { runMigrations } from './database/run-migrations';
 import { startWorkers } from './shared/queue/workers';
@@ -33,6 +33,8 @@ const subClient = new Redis(redisUrl, { lazyConnect: true });
 
 // Setup WebSocket handlers with authentication
 setupSocketHandlers(io);
+// Register global IO reference so services can emit events without circular deps
+setGlobalIO(io);
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {

@@ -86,43 +86,16 @@ export function startWorkers() {
     logger.error(`Email send failed for job ${job?.id}: ${err.message}`);
   });
 
-  // XP award worker
+  // XP award worker — WebSocket emission, league sync and quest progress are
+  // handled inside XPService.insertTransaction, so the worker only needs to
+  // call awardXP. This avoids double-emitting when XP is awarded directly
+  // (study sessions, streaks, quests) vs. via the queue.
   const xpWorker = new Worker(
     QUEUE_NAMES.XP_AWARDS,
     async (job) => {
       const { userId, source, sourceId, multiplier, metadata } = job.data;
       const { XPService } = await import('../../modules/xp/services/xp.service');
       const result = await XPService.awardXP({ userId, source, sourceId, multiplier, metadata });
-
-      // Sync XP to league membership
-      const { LeaguesService } = await import('../../modules/leagues/services/leagues.service');
-      LeaguesService.syncUserXP(userId).catch(err =>
-        logger.error('Error syncing league XP:', err)
-      );
-
-      // Update daily quest: earn_xp
-      const { QuestsService } = await import('../../modules/quests/services/quests.service');
-      QuestsService.updateProgress(userId, 'earn_xp', result.transaction.amount).catch(err =>
-        logger.error('Error updating earn_xp quest:', err)
-      );
-
-      // Emit XP gained event via WebSocket
-      emitToUser(io, userId, 'xp:gained', {
-        amount: result.transaction.amount,
-        source: result.transaction.source,
-        leveled_up: result.leveled_up,
-        new_level: result.new_level,
-        timestamp: new Date().toISOString(),
-      });
-
-      // If leveled up, emit celebration event
-      if (result.leveled_up) {
-        emitToUser(io, userId, 'xp:level_up', {
-          new_level: result.new_level,
-          timestamp: new Date().toISOString(),
-        });
-      }
-
       return { amount: result.transaction.amount, leveled_up: result.leveled_up };
     },
     { connection: redisConnection, concurrency: 5 }

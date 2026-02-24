@@ -11,6 +11,20 @@ interface AuthenticatedSocket extends Socket {
 // Store connected users: Map<userId, socketId>
 const connectedUsers = new Map<string, string>();
 
+// Global io reference — set once in server.ts so services can emit without
+// importing server.ts directly (avoids circular dependency).
+let _globalIO: Server | null = null;
+
+export function setGlobalIO(io: Server): void {
+  _globalIO = io;
+}
+
+export function emitToUserGlobal(userId: string, event: string, data: unknown): void {
+  if (_globalIO) {
+    _globalIO.to(`user:${userId}`).emit(event, data);
+  }
+}
+
 export const setupSocketHandlers = (io: Server) => {
   // Authentication middleware
   io.use((socket: AuthenticatedSocket, next) => {

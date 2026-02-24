@@ -2,6 +2,7 @@ import { query } from '../../../config/database';
 import { logger } from '../../../shared/utils/logger.util';
 import { XPTransaction, XPRule, XPSummary, AwardXPData } from '../interfaces/xp.interface';
 import { getCacheOrFetch, deleteCache } from '../../../shared/utils/cache.util';
+import { emitToUserGlobal } from '../../../websocket/socket.handler';
 
 export class XPService {
   /**
@@ -89,8 +90,39 @@ export class XPService {
     const newLevel = afterResult.rows[0].level;
     const leveled_up = newLevel > levelBefore;
 
-    // Invalidate cache
+    // Invalidate cache so next summary fetch is fresh
     await deleteCache(`xp:summary:${userId}`);
+
+    // ── Side effects (fire-and-forget, never block the main flow) ──────────
+
+    // 1. Emit WebSocket event so frontend toast and XPBar update immediately
+    emitToUserGlobal(userId, 'xp:gained', {
+      amount,
+      source,
+      leveled_up,
+      new_level: newLevel,
+      timestamp: new Date().toISOString(),
+    });
+    if (leveled_up) {
+      emitToUserGlobal(userId, 'xp:level_up', {
+        new_level: newLevel,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // 2. Sync XP to league membership rank (dynamic import to avoid circular dep)
+    import('../../leagues/services/leagues.service').then(({ LeaguesService }) => {
+      LeaguesService.syncUserXP(userId).catch((err: unknown) =>
+        logger.error('XP: league sync error:', err)
+      );
+    }).catch(() => {});
+
+    // 3. Update the earn_xp daily quest (dynamic import to avoid circular dep)
+    import('../../quests/services/quests.service').then(({ QuestsService }) => {
+      QuestsService.updateProgress(userId, 'earn_xp', amount).catch((err: unknown) =>
+        logger.error('XP: quest earn_xp update error:', err)
+      );
+    }).catch(() => {});
 
     return { transaction, leveled_up, new_level: newLevel };
   }
