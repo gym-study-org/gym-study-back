@@ -26,7 +26,11 @@ export class LeaguesService {
   static async getCurrentLeague(userId: string): Promise<CurrentLeagueResponse | null> {
     const seasonWeek = getSeasonWeek();
 
-    // Get or create membership for this week
+    // Sync this user's weekly_xp every time the league page is viewed so
+    // the ranking always reflects current XP (handles stale memberships too)
+    await this.syncUserXP(userId);
+
+    // Get or create membership for this week (already ensured by syncUserXP)
     let membership = await this.getOrCreateMembership(userId, seasonWeek);
 
     // Get league info
