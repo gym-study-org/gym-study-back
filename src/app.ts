@@ -32,6 +32,7 @@ import groupsRoutes from './modules/groups/groups.routes';
 import storiesRoutes from './modules/stories/stories.routes';
 import recommendationsRoutes from './modules/recommendations/recommendations.routes';
 import articlesRoutes from './modules/articles/articles.routes';
+import uploadRoutes from './modules/upload/upload.routes';
 
 export const createApp = (): Application => {
   const app = express();
@@ -93,6 +94,7 @@ export const createApp = (): Application => {
   app.use('/api/stories', storiesRoutes);
   app.use('/api/recommendations', recommendationsRoutes);
   app.use('/api/articles', articlesRoutes);
+  app.use('/api/upload', uploadRoutes);
 
   // 404 handler
   app.use((_req, res) => {

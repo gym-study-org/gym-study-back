@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-const contentTypes = ['text', 'image', 'study_update', 'achievement'] as const;
+const contentTypes = ['text', 'image', 'video', 'study_update', 'achievement'] as const;
 
 export const createStorySchema = z.object({
   body: z.object({

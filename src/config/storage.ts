@@ -65,6 +65,55 @@ export const avatarUpload = multer({
 });
 
 /**
+ * Multer middleware for generic media (images + videos, 50MB).
+ */
+export const mediaUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
+  fileFilter: (_req, file, cb) => {
+    // Use startsWith to handle codec suffixes like "video/webm;codecs=vp9,opus"
+    const allowedPrefixes = [
+      'image/jpeg', 'image/png', 'image/webp', 'image/gif',
+      'video/mp4', 'video/webm', 'video/quicktime', 'video/x-matroska',
+    ];
+    // Also allow generic types — browser may downgrade "video/webm;codecs=vp9,opus"
+    // to "text/plain" or "application/octet-stream" due to unquoted codec params.
+    const allowed =
+      allowedPrefixes.some(prefix => file.mimetype.startsWith(prefix)) ||
+      file.mimetype === 'text/plain' ||
+      file.mimetype === 'application/octet-stream';
+    if (allowed) {
+      cb(null, true);
+    } else {
+      cb(new Error('Formato inválido. Use JPEG, PNG, WebP, GIF, MP4, WebM ou MOV.'));
+    }
+  },
+});
+
+/**
+ * Upload generic media to MinIO under path media/{uuid}{ext}.
+ */
+export async function uploadMediaToStorage(
+  buffer: Buffer,
+  mimetype: string,
+  originalname: string
+): Promise<string> {
+  const ext = path.extname(originalname).toLowerCase() || '.bin';
+  const key = `media/${uuidv4()}${ext}`;
+
+  await s3Client.send(
+    new PutObjectCommand({
+      Bucket: env.MINIO_BUCKET,
+      Key: key,
+      Body: buffer,
+      ContentType: mimetype,
+    })
+  );
+
+  return getAvatarPublicUrl(key);
+}
+
+/**
  * Ensure MinIO bucket exists and is publicly readable.
  * Called once on server startup.
  */
