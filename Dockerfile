@@ -32,6 +32,9 @@ COPY --from=builder /app/src/database/migrations ./dist/database/migrations
 # Copy email templates (Handlebars files)
 COPY --from=builder /app/src/shared/templates ./dist/shared/templates
 
+# Copy API docs (OpenAPI)
+COPY --from=builder /app/docs/openapi.yaml ./docs/openapi.yaml
+
 # Create logs directory
 RUN mkdir -p logs
 

@@ -33,6 +33,7 @@ import storiesRoutes from './modules/stories/stories.routes';
 import recommendationsRoutes from './modules/recommendations/recommendations.routes';
 import articlesRoutes from './modules/articles/articles.routes';
 import uploadRoutes from './modules/upload/upload.routes';
+import docsRoutes, { openapiHandler } from './modules/docs/docs.routes';
 
 export const createApp = (): Application => {
   const app = express();
@@ -68,6 +69,10 @@ export const createApp = (): Application => {
       uptime: process.uptime(),
     });
   });
+
+  // API docs (Swagger UI + OpenAPI)
+  app.use('/docs', docsRoutes);
+  app.get('/openapi.yaml', openapiHandler);
 
   // API Routes
   app.use('/api/auth', authRoutes);
