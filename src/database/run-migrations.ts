@@ -32,10 +32,12 @@ async function ensureTrackingTable() {
     )
   `);
 
-  // Seed pre-tracking migrations if the table is empty (first run with tracking)
+  // Seed pre-tracking migrations if the table is empty (first run with tracking),
+  // but only on a legacy database: on a fresh one they still need to run
   const countResult = await pool.query('SELECT COUNT(*) FROM schema_migrations');
   const count = parseInt(countResult.rows[0].count, 10);
-  if (count === 0) {
+  const legacy = await pool.query("SELECT to_regclass('public.users') IS NOT NULL AS exists");
+  if (count === 0 && legacy.rows[0].exists) {
     logger.info('Seeding schema_migrations with pre-existing migrations...');
     for (const filename of PRE_TRACKING_MIGRATIONS) {
       await pool.query(
