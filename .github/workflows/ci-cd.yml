@@ -1,8 +1,8 @@
-name: CI/CD - Pipeline
+name: CI - Build da imagem
 
 on:
   push:
-    branches: [master, develop]
+    branches: [main]
 
 permissions:
   contents: write
@@ -15,16 +15,8 @@ jobs:
   Build:
     runs-on: ubuntu-latest
 
-    outputs:
-      tag: ${{ steps.tag.outputs.new_tag }}
-      env: ${{ steps.env.outputs.name }}
-      image: ${{ steps.image.outputs.name }}
-
     steps:
       - uses: actions/checkout@v4
-
-      - id: env
-        run: echo "name=${{ github.ref_name == 'master' && 'prd' || 'dev' }}" >> $GITHUB_OUTPUT
 
       - id: image
         run: echo "name=${GITHUB_REPOSITORY,,}" >> $GITHUB_OUTPUT
@@ -34,7 +26,6 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           tag_prefix: ""
-          append_to_pre_release_tag: ${{ steps.env.outputs.name == 'dev' && 'dev' || '' }}
 
       - uses: docker/login-action@v3
         with:
@@ -49,96 +40,4 @@ jobs:
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}:${{ steps.tag.outputs.new_tag }}
-            ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}:${{ steps.env.outputs.name }}
-
-  Deploy:
-    runs-on: ubuntu-latest
-    needs: build
-    environment: ${{ needs.build.outputs.env }}
-
-    steps:
-      - uses: appleboy/ssh-action@v1.0.3
-        env:
-          IMAGE: ${{ env.REGISTRY }}/${{ needs.build.outputs.image }}:${{ needs.build.outputs.tag }}
-          ENV: ${{ needs.build.outputs.env }}
-          GH_USER: ${{ github.actor }}
-          GH_TOKEN: ${{ secrets.GH_PAT }}
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USERNAME }}
-          password: ${{ secrets.VPS_PASSWORD }}
-          port: ${{ secrets.VPS_SSH_PORT }}
-          envs: IMAGE,ENV,GH_USER,GH_TOKEN
-          script: |
-            set -euo pipefail
-
-            # Colors
-            COLOR_DEFAULT="\e[0m"
-            COLOR_BLUE="\e[1;34m"
-            COLOR_GREEN="\e[1;32m"
-            COLOR_RED="\e[1;31m"
-            COLOR_YELLOW="\e[1;33m"
-
-            # Utility functions
-            log_info()    { echo -e "[INFO] - $1"; }
-            log_success() { echo -e "${COLOR_GREEN}✓ [SUCCESS] - $1${COLOR_DEFAULT}"; }
-            log_error()   { echo -e "${COLOR_RED}✗ [ERROR] - $1${COLOR_DEFAULT}"; }
-            log_warn()    { echo -e "${COLOR_YELLOW}⚠ [WARN] - $1${COLOR_DEFAULT}"; }
-
-            check_exit_code() {
-              if [ $1 -ne 0 ]; then
-                log_error "$2 falhou (exit code: $1)"
-                exit 1
-              else
-                log_success "$2"
-              fi
-            }
-
-            # Variables
-            CONTAINER="gym-study-back-$ENV"
-            ENV_FILE="/opt/gym-study/backend/.env.$ENV"
-
-            # Info to debug
-            echo -e "${COLOR_BLUE}##############################################${COLOR_DEFAULT}"
-            echo -e "${COLOR_BLUE}Ambiente: ${ENV}${COLOR_DEFAULT}"
-            echo -e "${COLOR_BLUE}Container: ${CONTAINER}${COLOR_DEFAULT}"
-            echo -e "${COLOR_BLUE}Imagem: ${IMAGE}${COLOR_DEFAULT}"
-            echo -e "${COLOR_BLUE}##############################################${COLOR_DEFAULT}"
-            echo ""
-
-            # Deploy
-            log_info "Autenticando no GitHub Container Registry..."
-            echo "$GH_TOKEN" | docker login ghcr.io -u "$GH_USER" --password-stdin > /dev/null 2>&1
-            check_exit_code $? "Autenticação ghcr.io"
-
-            log_info "Verificando arquivo de ambiente..."
-            [ ! -f "$ENV_FILE" ] && log_error "Arquivo não encontrado: $ENV_FILE" && exit 1
-            log_success "Arquivo de ambiente encontrado"
-
-            log_info "Removendo container antigo..."
-            docker rm -f "$CONTAINER" 2>/dev/null && log_success "Container removido" || log_warn "Nenhum container anterior"
-
-            log_info "Iniciando novo container..."
-            docker run -d \
-              --name "$CONTAINER" \
-              --network dim-shared \
-              --env-file "$ENV_FILE" \
-              --restart unless-stopped \
-              --pull always \
-              $IMAGE > /dev/null
-            check_exit_code $? "Criar container"
-
-            log_info "Verificando saúde do container..."
-            sleep 8
-
-            if docker ps --format '{{.Names}}' | grep -q "^${CONTAINER}$"; then
-              log_success "Container rodando"
-              echo ""
-              echo -e "${COLOR_GREEN}  Deploy concluído!${COLOR_DEFAULT}"
-            else
-              echo ""
-              echo -e "${COLOR_RED}  Deploy falhou!${COLOR_DEFAULT}"
-              log_error "Logs do container:"
-              docker logs "$CONTAINER" 2>&1 | tail -20
-              exit 1
-            fi
+            ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}:latest
