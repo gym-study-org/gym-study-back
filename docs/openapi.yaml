@@ -1,0 +1,353 @@
+openapi: 3.0.3
+info:
+  title: Gym Study API
+  version: 1.0.0
+  description: |
+    API da plataforma Gym Study: sessões de estudo viram XP, ofensivas, badges, ligas semanais e ranking.
+
+    1. Faça login em **POST /api/auth/login** (conta de demonstração do `scripts/seed-demo.mjs`).
+    2. Copie o `token` da resposta, clique em **Authorize** e cole.
+    3. Registre uma sessão de estudo e veja o XP e o ranking mudarem.
+servers:
+  - url: /
+    description: Esta instância
+tags:
+  - name: Auth
+  - name: Usuários
+  - name: Sessões de estudo
+  - name: Gamificação
+  - name: Social
+  - name: Público
+  - name: Saúde
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Error:
+      type: object
+      properties:
+        success: { type: boolean, example: false }
+        error:
+          type: object
+          properties:
+            code: { type: string, example: VALIDATION_ERROR }
+            message: { type: string }
+    User:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, example: ana@gymstudy.dev }
+        username: { type: string, example: ana }
+        full_name: { type: string, example: Ana Souza }
+        avatar_url: { type: string, nullable: true }
+        bio: { type: string, nullable: true }
+        total_study_hours: { type: string, example: '25.37' }
+        current_streak: { type: integer, example: 2 }
+        longest_streak: { type: integer, example: 2 }
+    AuthResponse:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        data:
+          type: object
+          properties:
+            user: { $ref: '#/components/schemas/User' }
+            token: { type: string, description: JWT de acesso (Bearer) }
+            refreshToken: { type: string }
+    StudySessionInput:
+      type: object
+      required: [title, subject, duration_minutes, started_at, finished_at]
+      properties:
+        title: { type: string, minLength: 3, example: Services e Ingress }
+        subject: { type: string, minLength: 2, example: Kubernetes }
+        description: { type: string }
+        duration_minutes: { type: integer, minimum: 1, example: 50 }
+        is_for_certification: { type: boolean, example: true }
+        certification_name: { type: string, example: CKAD }
+        tags: { type: array, items: { type: string }, example: [kubernetes] }
+        started_at: { type: string, format: date-time, example: '2026-09-26T19:00:00.000Z' }
+        finished_at: { type: string, format: date-time, example: '2026-09-26T19:50:00.000Z' }
+    StudySession:
+      allOf:
+        - $ref: '#/components/schemas/StudySessionInput'
+        - type: object
+          properties:
+            id: { type: string, format: uuid }
+            user_id: { type: string, format: uuid }
+            created_at: { type: string, format: date-time }
+    RankingEntry:
+      type: object
+      properties:
+        position: { type: string, example: '1' }
+        user_id: { type: string, format: uuid }
+        username: { type: string, example: ana }
+        avatar_url: { type: string, nullable: true }
+        current_streak: { type: integer, example: 2 }
+        total_study_hours: { type: string, example: '10.50' }
+        total_sessions: { type: string, example: '6' }
+        total_certifications: { type: integer, example: 0 }
+        is_friend: { type: boolean }
+        is_current_user: { type: boolean }
+    Post:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        content: { type: string }
+        post_type: { type: string, example: text }
+        tags: { type: array, items: { type: string } }
+        likes_count: { type: integer }
+        comments_count: { type: integer }
+        author_username: { type: string }
+        author_full_name: { type: string }
+        created_at: { type: string, format: date-time }
+
+security:
+  - bearerAuth: []
+
+paths:
+  /health:
+    get:
+      tags: [Saúde]
+      summary: Health check
+      security: []
+      responses:
+        '200':
+          description: API no ar
+          content:
+            application/json:
+              example: { status: ok, timestamp: '2026-09-26T05:28:14.255Z', uptime: 45.7 }
+
+  /api/auth/register:
+    post:
+      tags: [Auth]
+      summary: Criar conta
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, username, password]
+              properties:
+                email: { type: string, format: email }
+                username: { type: string, pattern: '^[a-zA-Z0-9_-]+$', minLength: 3 }
+                password: { type: string, minLength: 8, description: 'Maiúscula, minúscula e número' }
+                full_name: { type: string }
+            example: { email: joao@gymstudy.dev, username: joao, password: Demo1234, full_name: João Pereira }
+      responses:
+        '201': { description: Conta criada, content: { application/json: { schema: { $ref: '#/components/schemas/AuthResponse' } } } }
+        '400': { description: Dados inválidos, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '409': { description: E-mail ou usuário já existe, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: Login com e-mail e senha
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+            example: { email: ana@gymstudy.dev, password: Demo1234 }
+      responses:
+        '200': { description: Autenticado, content: { application/json: { schema: { $ref: '#/components/schemas/AuthResponse' } } } }
+        '401': { description: Credenciais inválidas, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /api/users/me:
+    get:
+      tags: [Usuários]
+      summary: Perfil do usuário logado
+      responses:
+        '200':
+          description: Perfil
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data: { $ref: '#/components/schemas/User' }
+        '401': { description: Token ausente ou inválido }
+
+  /api/study-sessions:
+    get:
+      tags: [Sessões de estudo]
+      summary: Listar minhas sessões
+      responses:
+        '200': { description: Lista de sessões }
+    post:
+      tags: [Sessões de estudo]
+      summary: Registrar uma sessão de estudo
+      description: Soma horas, atualiza a ofensiva, concede XP e verifica badges e conquistas.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StudySessionInput' }
+      responses:
+        '201':
+          description: Sessão registrada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data: { $ref: '#/components/schemas/StudySession' }
+        '400': { description: Dados inválidos, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /api/study-sessions/stats:
+    get:
+      tags: [Sessões de estudo]
+      summary: Estatísticas de estudo (total, por assunto, recentes)
+      responses:
+        '200':
+          description: Estatísticas
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  total_sessions: 7
+                  total_hours: 6
+                  total_minutes: 45
+                  subjects: [{ subject: Kubernetes, count: 3, total_minutes: 195 }]
+
+  /api/xp/me:
+    get:
+      tags: [Gamificação]
+      summary: XP e nível do usuário
+      responses:
+        '200':
+          description: XP
+          content:
+            application/json:
+              example:
+                success: true
+                data: { total_xp: 455, weekly_xp: 455, level: 3, next_level_xp: 900, xp_to_next_level: 445, level_progress_percent: 11 }
+
+  /api/streak/status:
+    get:
+      tags: [Gamificação]
+      summary: Ofensiva (dias seguidos estudando) e freezes
+      responses:
+        '200': { description: Status da ofensiva }
+
+  /api/leagues/current:
+    get:
+      tags: [Gamificação]
+      summary: Liga da semana (Bronze a Diamante) com os membros
+      responses:
+        '200':
+          description: Liga atual
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  league: { tier: 1, name: Bronze, promotion_slots: 7 }
+                  season_week: 2026-W39
+                  my_position: 1
+                  my_weekly_xp: 455
+                  members: [{ username: ana, weekly_xp: 455, position: 1, level: 3 }]
+
+  /api/badges/me:
+    get:
+      tags: [Gamificação]
+      summary: Badges com nível e progresso
+      responses:
+        '200': { description: Badges do usuário }
+
+  /api/quests/daily:
+    get:
+      tags: [Gamificação]
+      summary: Missões do dia
+      responses:
+        '200': { description: Missões }
+
+  /api/ranking/weekly:
+    get:
+      tags: [Social]
+      summary: Ranking da semana por horas estudadas
+      responses:
+        '200':
+          description: Ranking
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data: { type: array, items: { $ref: '#/components/schemas/RankingEntry' } }
+
+  /api/ranking/global:
+    get:
+      tags: [Social]
+      summary: Ranking geral
+      responses:
+        '200': { description: Ranking }
+
+  /api/feed:
+    get:
+      tags: [Social]
+      summary: Feed de posts
+      parameters:
+        - { in: query, name: limit, schema: { type: integer, default: 20, maximum: 50 } }
+        - { in: query, name: cursor, schema: { type: string } }
+      responses:
+        '200':
+          description: Posts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data:
+                    type: object
+                    properties:
+                      posts: { type: array, items: { $ref: '#/components/schemas/Post' } }
+                      next_cursor: { type: string }
+                      has_more: { type: boolean }
+
+  /api/feed/posts:
+    post:
+      tags: [Social]
+      summary: Publicar no feed
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content: { type: string, maxLength: 5000 }
+                post_type: { type: string, default: text }
+                tags: { type: array, items: { type: string } }
+                visibility: { type: string, enum: [public, friends, private], default: public }
+            example: { content: 'Mais 50 minutos de Kubernetes hoje! 💪', tags: [Kubernetes] }
+      responses:
+        '201': { description: Post criado }
+
+  /api/public/profile/{username}:
+    get:
+      tags: [Público]
+      summary: Perfil público (sem login)
+      security: []
+      parameters:
+        - { in: path, name: username, required: true, schema: { type: string }, example: ana }
+      responses:
+        '200': { description: Perfil público }
+        '404': { description: Usuário não encontrado }
