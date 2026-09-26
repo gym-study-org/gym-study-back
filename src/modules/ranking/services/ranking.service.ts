@@ -29,7 +29,6 @@ export class RankingService {
         SELECT
           u.id as user_id,
           u.username,
-          u.email,
           u.avatar_url,
           u.total_study_hours,
           u.current_streak,
@@ -92,7 +91,6 @@ export class RankingService {
         SELECT
           u.id as user_id,
           u.username,
-          u.email,
           u.avatar_url,
           u.total_study_hours,
           u.current_streak,
@@ -141,7 +139,6 @@ export class RankingService {
         SELECT
           u.id as user_id,
           u.username,
-          u.email,
           u.avatar_url,
           u.current_streak,
           COALESCE(SUM(ss.duration_minutes) / 60.0, 0) as total_study_hours,
@@ -160,7 +157,7 @@ export class RankingService {
             AND obtained_at >= DATE_TRUNC('month', CURRENT_DATE)
           GROUP BY user_id
         ) cert_counts ON cert_counts.user_id = u.id
-        GROUP BY u.id, u.username, u.email, u.avatar_url, u.current_streak, cert_counts.total_certifications
+        GROUP BY u.id, u.username, u.avatar_url, u.current_streak, cert_counts.total_certifications
       )
       SELECT
         ms.*,
@@ -195,7 +192,6 @@ export class RankingService {
         SELECT
           u.id as user_id,
           u.username,
-          u.email,
           u.avatar_url,
           u.current_streak,
           COALESCE(SUM(ss.duration_minutes) / 60.0, 0) as total_study_hours,
@@ -207,7 +203,7 @@ export class RankingService {
         FROM users u
         LEFT JOIN study_sessions ss ON ss.user_id = u.id
           AND ss.started_at >= DATE_TRUNC('week', CURRENT_DATE)
-        GROUP BY u.id, u.username, u.email, u.avatar_url, u.current_streak
+        GROUP BY u.id, u.username, u.avatar_url, u.current_streak
       )
       SELECT
         ws.*,

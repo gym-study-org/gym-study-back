@@ -2,7 +2,6 @@ export interface RankingEntry {
   position: number;
   user_id: string;
   name: string;
-  email: string;
   avatar_url: string | null;
   total_study_hours: number;
   total_sessions: number;
