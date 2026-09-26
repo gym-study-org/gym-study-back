@@ -6,7 +6,8 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await redis.quit();
+  // tests/setup.ts também encerra a conexão; a segunda chamada não deve falhar
+  await redis.quit().catch(() => {});
 });
 
 beforeEach(async () => {

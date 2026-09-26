@@ -13,7 +13,7 @@ const config: Config = {
     '@websocket/(.*)': '<rootDir>/src/websocket/$1',
     '@jobs/(.*)': '<rootDir>/src/jobs/$1',
   },
-  setupFilesAfterSetup: ['<rootDir>/tests/setup.ts'],
+  setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
   coverageDirectory: 'coverage',
   collectCoverageFrom: [
     'src/**/*.ts',

@@ -148,7 +148,6 @@ export class ChallengesService {
       SELECT
         cp.*,
         u.username as user_name,
-        u.email as user_email,
         u.avatar_url as user_avatar_url
       FROM challenge_participants cp
       JOIN users u ON u.id = cp.user_id
@@ -326,7 +325,6 @@ export class ChallengesService {
       SELECT
         cp.*,
         u.username as user_name,
-        u.email as user_email,
         u.avatar_url as user_avatar_url,
         RANK() OVER (ORDER BY cp.current_value DESC) as position
       FROM challenge_participants cp

@@ -39,7 +39,6 @@ export interface ChallengeWithDetails extends Challenge {
 
 export interface ParticipantWithUser extends ChallengeParticipant {
   user_name: string;
-  user_email: string;
   user_avatar_url: string | null;
 }
 

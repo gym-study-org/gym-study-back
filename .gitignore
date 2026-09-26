@@ -41,3 +41,6 @@ coverage/
 .cache/
 temp/
 tmp/
+
+# Claude Code (configuração local)
+.claude/settings.local.json

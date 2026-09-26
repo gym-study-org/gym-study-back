@@ -189,7 +189,6 @@ export class FriendshipsService {
         f.requester_id,
         u.username as requester_name,
         u.full_name as requester_full_name,
-        u.email as requester_email,
         u.avatar_url as requester_avatar_url,
         f.created_at
       FROM friendships f
@@ -212,7 +211,6 @@ export class FriendshipsService {
         f.addressee_id,
         u.username as addressee_name,
         u.full_name as addressee_full_name,
-        u.email as addressee_email,
         u.avatar_url as addressee_avatar_url,
         f.created_at
       FROM friendships f
@@ -270,7 +268,6 @@ export class FriendshipsService {
         u.id,
         u.username,
         u.full_name,
-        u.email,
         u.avatar_url,
         u.total_study_hours,
         CASE
@@ -288,7 +285,7 @@ export class FriendshipsService {
         OR (f.requester_id = u.id AND f.addressee_id = $1)
       )
       WHERE u.id != $1
-        AND (u.username ILIKE $2 OR u.full_name ILIKE $2 OR u.email ILIKE $2)
+        AND (u.username ILIKE $2 OR u.full_name ILIKE $2)
       LIMIT 20
     `;
 

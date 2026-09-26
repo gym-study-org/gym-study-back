@@ -458,7 +458,7 @@ class BadgesService {
   private getCurrentValueForBadge(badge: BadgeDefinition, userStats: UserStats): number {
     const statKey = STAT_KEY_MAP[badge.stat_key];
     if (statKey) {
-      return userStats[statKey] || 0;
+      return Number(userStats[statKey]) || 0;
     }
     return 0;
   }
